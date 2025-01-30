@@ -1,0 +1,396 @@
+package com.sidbi.refinance.appr.serviceimpl;
+
+import java.io.ByteArrayInputStream;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Base64;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+
+import com.itextpdf.io.source.ByteArrayOutputStream;
+import com.itextpdf.kernel.events.PdfDocumentEvent;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
+import com.itextpdf.kernel.pdf.PdfReader;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.layout.Document;
+import com.sidbi.refinance.appr.entity.AppraisalSectionDocuments;
+import com.sidbi.refinance.appr.repo.AppraisalSectionDocumentsRepo;
+import com.sidbi.refinance.appr.service.ApprDueDeligenceCommentService;
+import com.sidbi.refinance.appr.service.ApprDueDeligenceOtherService;
+import com.sidbi.refinance.appr.service.ApprInternalRatingService;
+import com.sidbi.refinance.appr.service.ApprProposedStandardTermService;
+import com.sidbi.refinance.appr.service.ApprQuantumAsstRecommService;
+import com.sidbi.refinance.appr.service.ApprRiskToleranceMFIService;
+import com.sidbi.refinance.appr.service.ApprTermAndConditionService;
+import com.sidbi.refinance.appr.service.AppraisalCompliChecksService;
+import com.sidbi.refinance.appr.service.AppraisalCompliancePositionService;
+import com.sidbi.refinance.appr.service.AppraisalExecutiveSummaryService;
+import com.sidbi.refinance.appr.service.AppraisalExternalRatingService;
+import com.sidbi.refinance.appr.service.AppraisalFacilityService;
+import com.sidbi.refinance.appr.service.AppraisalFinalRecommService;
+import com.sidbi.refinance.appr.service.AppraisalLosDisclosuresService;
+import com.sidbi.refinance.appr.service.AppraisalLosFundGapMFIService;
+import com.sidbi.refinance.appr.service.AppraisalProfileService;
+import com.sidbi.refinance.appr.service.AppraisalReportService;
+import com.sidbi.refinance.appr.service.AppraisalSecurityTermsService;
+import com.sidbi.refinance.appr.service.CommonService;
+import com.sidbi.refinance.appr.service.FinancialSubsidiaryService;
+import com.sidbi.refinance.appr.service.LosFinDetailsService;
+import com.sidbi.refinance.appr.service.LosTop3LenderService;
+import com.sidbi.refinance.common.model.ReportData;
+import com.sidbi.refinance.common.util.AppConstants;
+import com.sidbi.refinance.common.util.Section;
+import com.sidbi.refinance.online.service.ApplicationFormService;
+import com.sidbi.refinance.online.service.HoldingKmpShareDetailsService;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+public class AppraisalReportServiceImpl implements AppraisalReportService {
+
+	@Autowired
+	AppraisalProfileService appraisalProfileService;
+
+	@Autowired
+	AppraisalExecutiveSummaryService apprExeSummService;
+
+	@Autowired
+	AppraisalExternalRatingService apprExternalRatingService;
+
+	@Autowired
+	ApprInternalRatingService apprInternalRatingService;
+
+	@Autowired
+	CommonService commService;
+
+	@Autowired
+	LosFinDetailsService finAnalysisService;
+
+	@Autowired
+	AppraisalCompliancePositionService compPositionService;
+
+	@Autowired
+	AppraisalCompliChecksService compliChecksService;
+
+	@Autowired
+	ApprRiskToleranceMFIService mfiService;
+
+	@Autowired
+	ApprDueDeligenceCommentService dueDeligenceCommentService;
+
+	@Autowired
+	ApprDueDeligenceOtherService dueDeligenceOtherService;
+
+	@Autowired
+	LosTop3LenderService top3LenderService;
+
+	@Autowired
+	AppraisalLosDisclosuresService losDisclosuresService;
+
+	@Autowired
+	ApprQuantumAsstRecommService quantumAsstRecommService;
+
+	@Autowired
+	AppraisalLosFundGapMFIService losFundGapMFIService;
+
+	@Autowired
+	AppraisalSecurityTermsService securityTermsService;
+
+	@Autowired
+	ApprProposedStandardTermService standardTermService;
+
+	@Autowired
+	AppraisalFinalRecommService finalRecommService;
+
+	@Autowired
+	ApprTermAndConditionService termAndConditionService;
+
+	@Autowired
+	FinancialSubsidiaryService finSubsidiaryService;
+
+	@Autowired
+	AppraisalSectionDocumentsRepo appraisalSectionDocumentsRepo;
+
+	@Autowired
+	ApplicationFormService applFormService;
+
+	@Autowired
+	AppraisalFacilityService facilityService;
+
+	@Autowired
+	HoldingKmpShareDetailsService shareDetailService;
+
+	@Override
+	public ReportData genReportBase64(String applId, String scheme) {
+		String data = "";
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		PdfWriter writer = new PdfWriter(baos);
+		PdfDocument pdf = new PdfDocument(writer);
+		ReportData reportData = new ReportData();
+
+		Resource resource = new ClassPathResource("Font/Rupee_Foradian.ttf");
+
+		try {
+			Document doc = new Document(pdf);
+			doc.setFontSize(10f);
+
+			PdfFont customFont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), "Identity-H",
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			doc.setFont(customFont);
+			doc.setMargins(56.69f, 56.69f, 56.69f, 56.69f);
+
+			HeaderFooterEventHandler handler = new HeaderFooterEventHandler(doc, "totReport");
+			pdf.addEventHandler(PdfDocumentEvent.END_PAGE, handler);
+
+			apprExeSummService.getGenerateExecutiveSummaryReport(doc, applId);
+			commService.generateAppraisalPastAssistanceReport(doc, applId);
+			applFormService.getNBFCMFIReport(doc, applId);
+			shareDetailService.generateShareHoldingDetailsHoldingCompanyReport(doc, applId);
+			shareDetailService.generateShareHoldingDetailsHoldingCompanyReportSecond(doc, applId);
+			appraisalProfileService.generateGroupDetailsAndComManagementReport(doc, applId);
+			apprExternalRatingService.getGenerateAppraisalExternalReport(doc, applId);
+			apprExternalRatingService.getGenerateAppraisalExternalReportSecond(doc, applId);
+			apprInternalRatingService.generateAppraisalInternalRatingScoreReport(doc, applId);
+
+			finAnalysisService.generateAppraisalFinancialDetailsReport(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReport(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelFirstReport(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportSecondPart(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportSecondFirstPart(doc, applId);
+
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportThirdPart(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportFourthPart(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportFifthPart(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportSixthPart(doc, applId);
+			finAnalysisService.generateAppraisalFinancialDetailsCramelReportSeventhPart(doc, applId);
+			compPositionService.generateAppraisalCompliancePositionReport(doc, applId);
+			compliChecksService.generateAppraComplianceCheckReport(doc, applId);
+
+			mfiService.generateAppraisalRiskToleranceFrameworkReport(doc, applId);
+			dueDeligenceCommentService.generateAppraisalRTFCommnentsReport(doc, applId);
+			dueDeligenceOtherService.getDueDigilenceOthersReportGenerate(doc, applId);
+			top3LenderService.generateAppraisalTop3LendersReport(doc, applId);
+
+			losDisclosuresService.generateDueDigilanceDisclosureReport(doc, applId);
+			quantumAsstRecommService.generateDueDigilanceQuantammAssitanceReport(doc, applId);
+			losFundGapMFIService.generateDueDigilanceFundingGapReport(doc, applId);
+			standardTermService.generateAppraisalConclusionProposedKeyRiskMitigantsReport(doc, applId);
+			facilityService.generateApprConclusionFacilityDetailsReport(doc, applId);
+			facilityService.generateApprConclusionFacilityDetailsReportSecond(doc, applId);
+			securityTermsService.generateAppraisalConclusionProposedTermsReport(doc, applId);
+
+			finalRecommService.generateAppraisalConclusionCovenantAndRecommendationReport(doc, applId);
+			termAndConditionService.generateAppraisalAnnexurePreDisbursementConditionsReport(doc, applId);
+
+			termAndConditionService.generateAppraisalAnnexureExposureNormsReport(doc, applId);
+			termAndConditionService.generateAppraisalAnnexure3ComplianceNormsReport(doc, applId);
+			finSubsidiaryService.generateAnnexureFour(doc, applId);
+
+			Optional<AppraisalSectionDocuments> optional = appraisalSectionDocumentsRepo.findByApplIdAndSection(applId,
+					Section.RATIONALE);
+
+			copyPDF(pdf, optional);
+
+			doc.close();
+
+			data = Base64.getEncoder().encodeToString(baos.toByteArray());
+
+			baos.close();
+
+			reportData.setMimeType(AppConstants.PDF_MIME);
+
+			byte[] pdfBytes = Base64.getDecoder().decode(data);
+			ByteArrayInputStream inStream = new ByteArrayInputStream(pdfBytes);
+			PdfReader pdfReader = new PdfReader(inStream);
+
+			ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+			PdfWriter writer2 = new PdfWriter(outStream);
+			PdfDocument sourcePdfDoc = new PdfDocument(pdfReader);
+			PdfDocument destinationPdfDoc = new PdfDocument(writer2);
+
+			sourcePdfDoc.copyPagesTo(1, sourcePdfDoc.getNumberOfPages(), destinationPdfDoc);
+			Document doc2 = new Document(destinationPdfDoc);
+			log.info("total pages are" + destinationPdfDoc.getNumberOfPages());
+			doc2.setFontSize(10f);
+			updateTotalPageNumber(destinationPdfDoc);
+			sourcePdfDoc.close();
+			destinationPdfDoc.close();
+
+			byte[] newPdfBytes = outStream.toByteArray();
+			String base64NewPdf = Base64.getEncoder().encodeToString(newPdfBytes);
+			reportData.setRepData(base64NewPdf);
+			doc2.close();
+
+		} catch (
+
+		Exception e) {
+			e.printStackTrace();
+			log.error("there is an exception in the report  generation of the appraisal");
+		}
+		return reportData;
+	}
+
+	public void copyPDF(PdfDocument pdf, Optional<AppraisalSectionDocuments> optional) {
+		AppraisalSectionDocuments annexDocum;
+		if (optional.isPresent()) {
+			annexDocum = optional.get();
+
+			log.info("pathinsideurlPahtis " + annexDocum.getDocumentUrl());
+			if (Files.exists(Paths.get(annexDocum.getDocumentUrl()))) {
+				try(PdfReader reader2 = new PdfReader(annexDocum.getDocumentUrl());
+					PdfDocument docum = new PdfDocument(reader2)) {
+					docum.copyPagesTo(1, docum.getNumberOfPages(), pdf);
+					log.info("number of pages after second copy " + pdf.getNumberOfPages());
+				} catch (Exception ex) {
+					log.error("Exception at copyPDF {}",ex.getMessage());
+				}
+			}
+
+		}
+	}
+
+	public void updateTotalPageNumber(PdfDocument pdfDoc) {
+		try {
+
+			String fontPath2 = "src/main/resources/Font/Time_Roman_Bold_Italic.ttf";
+
+			PdfFont font2 = PdfFontFactory.createFont(fontPath2, "Identity-H",
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+
+			int totalPages = pdfDoc.getNumberOfPages();
+
+			for (int i = 1; i <= totalPages; i++) {
+				PdfPage page = pdfDoc.getPage(i);
+				PdfCanvas canvas = new PdfCanvas(page);
+
+				canvas.beginText().setFontAndSize(font2, 10)
+						.moveText((page.getPageSize().getWidth() / 2) - 50, page.getPageSize().getBottom() + 20)
+						.showText("Page " + i + " of " + totalPages).endText();
+				canvas.release();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.info("there is an exception in setting the header and footer  and exception is " + e.getMessage());
+		}
+	}
+
+	@Override
+	public String decodeBase64ToPdf(String base64EncodedData, String outputFilePath) {
+		try {
+			byte[] pdfBytes = Base64.getDecoder().decode(base64EncodedData);
+			try (OutputStream os = new FileOutputStream(outputFilePath)) {
+				os.write(pdfBytes);
+			}
+			return "PDF created successfully at: " + outputFilePath;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return "Error creating PDF: " + e.getMessage();
+		}
+	}
+}
+package com.sidbi.refinance.appr.serviceimpl;
+
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+
+import com.itextpdf.io.image.ImageData;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.kernel.events.Event;
+import com.itextpdf.kernel.events.IEventHandler;
+import com.itextpdf.kernel.events.PdfDocumentEvent;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.geom.Rectangle;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.layout.Canvas;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Image;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class HeaderFooterEventHandler implements IEventHandler {
+	protected Document doc;
+	private String pdfName;
+	private Image headerImage;
+
+	public HeaderFooterEventHandler(Document doc2, String pdfName) {
+		this.doc = doc2;
+		this.pdfName = pdfName;
+	}
+
+	public HeaderFooterEventHandler(String pdfName2) {
+		this.pdfName = pdfName2;
+		Resource resource = new ClassPathResource("Images/sidbi_logo4.png");
+		try {
+			ImageData imageData = ImageDataFactory.create(resource.getURL());
+			headerImage = new Image(imageData);
+			headerImage.scale(0.25f, 0.25f);
+			headerImage.setFixedPosition(56.69f, 800f);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("there is an exception in the report  generation of the appraisal");
+		}
+	}
+
+	@Override
+	public void handleEvent(Event event) {
+		PdfDocumentEvent docEvent = (PdfDocumentEvent) event;
+		PdfDocument pdfDoc = docEvent.getDocument();
+		PdfPage page = docEvent.getPage();
+		int pageNumber = pdfDoc.getPageNumber(page);
+		PdfCanvas canvas = new PdfCanvas(docEvent.getPage());
+		Rectangle pageSize = docEvent.getPage().getPageSize();
+
+		try (Canvas canv = new Canvas(canvas, pageSize)) {
+
+			String fontPath = "src/main/resources/Font/Rupee_Foradian.ttf";
+			String fontPath2 = "src/main/resources/Font/Time_Roman_Bold_Italic.ttf";
+			PdfFont font1 = PdfFontFactory.createFont(fontPath, "Identity-H",
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			PdfFont font2 = PdfFontFactory.createFont(fontPath2, "Identity-H",
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+
+			if (pdfName.equals("MIR") || pdfName.equals("LOI")) {
+
+				log.info("heightis  " + pageSize.getHeight());
+				canv.add(headerImage).setFixedPosition(56.69f, pageSize.getHeight() - 60, 60);
+			}
+
+			else {
+				canvas.beginText();
+				canvas.setFontAndSize(font1, 8);
+				canvas.moveText(pageSize.getWidth() / 2 + 120, pageSize.getTop() - 10)
+						.showText("Memorandum to <CCC CGM>");
+				canvas.moveText(0, -15).showText("Urgocapital Limited");
+				canvas.moveText(0, -15).showText("Scheme of Assistance");
+				canvas.moveText(0, -15).showText("TL of ₹200");
+				canvas.endText();
+				canvas.beginText().setFontAndSize(font2, 10)
+						.moveText((pageSize.getWidth() / 2) - 50, pageSize.getBottom() + 20)
+						.showText("Page " + pageNumber + " of ").endText();
+
+				canvas.release();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("there is an exception in the getting the path of the ");
+		}
+
+	}
+
+}

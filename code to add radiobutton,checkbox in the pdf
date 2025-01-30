@@ -1,0 +1,89 @@
+Code to add radiobutton,checkbox in pdfs
+Step1:add the image of radio button to the image folder
+step2:add the path to the image in the constant class
+step3:create the method to return the image of the radiobutton/checkbox in the reportUtil class
+step4:call the reportutil method to add the radiobutton/checkbox in the pdf
+private void populateListing(Document doc, ApplListingFormDto listDto, String applId) throws IOException {
+		doc.add(new Paragraph("Listing Status").setBold());
+		if (null != listDto) {
+			Table lTab = new Table(UnitValue.createPercentArray(3)).setFontSize(AppConstants.FONT);
+			lTab.setWidth(UnitValue.createPercentValue(100)).setFixedLayout();
+
+			Cell l1 = new Cell().add(new Paragraph("Is borrower company listed?").setBold()).setFontSize(9)
+					.add(new Paragraph().add(getRadioImage(listDto.getIsListed())).setFontSize(AppConstants.FONT));
+			Cell l2 = new Cell().add(new Paragraph("Does subsidiary company exist ?").setBold()).setFontSize(9).add(
+					new Paragraph().add(getRadioImage(listDto.getIsSubsidaryExist())).setFontSize(AppConstants.FONT));
+			Cell l3 = new Cell().add(new Paragraph("Does associate Company exist?").setBold()).setFontSize(9)
+					.add(new Paragraph().add(getRadioImage(listDto.getIsAssocExist())).setFontSize(AppConstants.FONT));
+			lTab.addCell(l1);
+			lTab.addCell(l2);
+			lTab.addCell(l3);
+			Cell l4 = new Cell().add(new Paragraph("Does parent company exist?").setBold()).setFontSize(9)
+					.add(new Paragraph().add(getRadioImage(listDto.getIsParentExist())).setFontSize(AppConstants.FONT));
+			Cell l5 = new Cell().add(new Paragraph("Is parent company listed?").setBold()).setFontSize(9)
+					.add(new Paragraph().add(getRadioImage(listDto.getIsParentExist())).setFontSize(AppConstants.FONT));
+			Cell l6 = new Cell().add(new Paragraph("Parent Company Name").setBold()).setFontSize(9).add(new Paragraph()
+					.add(reportUtil.getData(listDto.getParentCompName())).setFontSize(AppConstants.FONT));
+			lTab.addCell(l4);
+			lTab.addCell(l5);
+			lTab.addCell(l6);
+			Cell l7 = new Cell().add(new Paragraph("Does holding Company exist ?").setBold()).setFontSize(9).add(
+					new Paragraph().add(getRadioImage(listDto.getIsHoldingCompExist())).setFontSize(AppConstants.FONT));
+			Cell l8 = new Cell().add(new Paragraph("Is holding company listed?").setBold()).setFontSize(9)
+					.add(new Paragraph().add(getRadioImage(listDto.getIsHoldingCompListed()))
+							.setFontSize(AppConstants.FONT));
+			Cell l9 = new Cell().add(new Paragraph("Holding Company Name").setBold()).setFontSize(9).add(new Paragraph()
+					.add(reportUtil.getData(listDto.getHoldingCompName())).setFontSize(AppConstants.FONT));
+			lTab.addCell(l7);
+			lTab.addCell(l8);
+			lTab.addCell(l9);
+}
+			doc.add(lTab);
+			doc.add(ReportUtil.secSpace);
+}
+private Image getRadioImage(String value) throws IOException {
+		Image image = null;
+		if ("Y".equalsIgnoreCase(value)) {
+			image = reportUtil.getYesRadioBox();
+		} else {
+			image = reportUtil.getNoRadioBox();
+		}
+		return image;
+	}
+//now methods in the reportUtil class
+public Image getNoRadioBox() throws IOException {
+		Resource noRadioImgRes = new ClassPathResource(AppConstants.NO_RADIO);
+		ImageData imageDataNoR = ImageDataFactory.create(noRadioImgRes.getURL());
+		Image noRadioImage = new Image(imageDataNoR);
+		noRadioImage.scale(0.7f, 0.7f);
+		return noRadioImage;
+	}
+
+	public Image getYesRadioBox() throws IOException {
+		Resource yesRadioImgRes = new ClassPathResource(AppConstants.YES_RADIO);
+		ImageData imageDataYesR = ImageDataFactory.create(yesRadioImgRes.getURL());
+		Image yesRadioImage = new Image(imageDataYesR);
+		yesRadioImage.scale(0.7f, 0.7f);
+		return yesRadioImage;
+	}
+
+	public Image getUncheckedBox() throws IOException {
+		Resource unCheckedImgRes = new ClassPathResource(AppConstants.UNCHECKED_BOX);
+		ImageData imageDataUN = ImageDataFactory.create(unCheckedImgRes.getURL());
+		Image unCheckedImage = new Image(imageDataUN);
+		unCheckedImage.scale(0.05f, 0.05f);
+		return unCheckedImage;
+	}
+
+	public Image getCheckedBox() throws IOException {
+		Resource checkedImgRes = new ClassPathResource(AppConstants.CHECKED_BOX);
+		ImageData imageData = ImageDataFactory.create(checkedImgRes.getURL());
+		Image checkedImage = new Image(imageData);
+		checkedImage.scale(0.05f, 0.05f);
+		return checkedImage;
+	}
+//now code of constants class containg the path to the image of radiobutton/checkbox
+	public static final String CHECKED_BOX = "Images/checkedBox.png";
+	public static final String UNCHECKED_BOX = "Images/UncheckedBox.png";
+	public static final String YES_RADIO = "Images/Yes_radio_bnw.png";
+	public static final String NO_RADIO = "Images/No_radio_bnw.png";

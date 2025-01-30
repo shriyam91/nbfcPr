@@ -1,0 +1,187 @@
+@PostMapping(value = "/authenticate")
+	@Operation(summary = "Get SSO jwt token to access NBFC Refinance related  API's")
+	public ResponseEntity<Object> createAuthenticationTokenWithPath(@RequestBody LoginUserModel loginModel) {
+
+		String userId = "";
+		String password = "";
+		String ssoStatus = userDetailsService.verifyJwtTokenInSso(loginModel.getToken());
+		if (ssoStatus != null && ssoStatus.equals(AppConstants.STRING_SUCCESS)) {
+			LoginUserModel loginModel2 = userDetailsService.getUserLoginDetails(loginModel);
+			userId = loginModel2.getUserId();
+			password = loginModel2.getPassword();
+
+			if (loginModel2.getUserName() == null) {
+				return new ResponseWithObject().generateResponse(AppConstants.INVALID_CREDENTIALS, HttpStatus.NOT_FOUND,
+						AppConstants.INVALID_CREDENTIALS);
+			}
+
+			UserDetails details = new User(userId, password, new ArrayList<>());
+
+			final String token = jwtTokenUtil.generateToken(details);
+
+			loginModel2.setPassword("");
+			loginModel2.setPortalToken(token);
+
+			if (token != null) {
+				return new ResponseWithObject().generateResponse(AppConstants.SUCCESS, HttpStatus.OK, loginModel2);
+			} else {
+				return new ResponseWithObject().generateResponse(AppConstants.INVALID, HttpStatus.INTERNAL_SERVER_ERROR,
+						AppConstants.TOKEN_FAILED);
+			}
+		} else {
+			return new ResponseWithObject().generateResponse(AppConstants.INVALID, HttpStatus.INTERNAL_SERVER_ERROR,
+					AppConstants.TOKEN_FAILED);
+		}
+	}
+	@Override
+	public String verifyJwtTokenInSso(String token) {
+		String status = AppConstants.STRING_FAILED;
+		String tokenWithBearer = "Bearer " + token;
+		String body = new JSONObject().put(AppConstants.SSO_TOKEN, token)
+				.put(AppConstants.SSO_REQUEST_TYPE, AppConstants.USER_ROLE).toString();
+		Optional<com.sidbi.refinance.common.entity.CdaWrapperConfigEntity> wrapperConfigData = cdaWrapperConfigRepo
+				.findByApiType(AppConstants.SSO_TOKEN_VERIFY_API);
+		if (wrapperConfigData.isPresent()) {
+			Object[] ssoRes = getSsomDetailsFromApisResponse(
+					callSsoAPI(wrapperConfigData.get().getPanUrl(), tokenWithBearer, body));
+			if (ssoRes != null && ssoRes[0] != null && ssoRes[0].equals("200") && ssoRes[1] != null
+					&& ssoRes[1].equals("Token is Valid")) {
+				status = AppConstants.STRING_SUCCESS;
+			}
+		}
+		return status;
+	}
+public interface CdaWrapperConfigRepo extends JpaRepository<CdaWrapperConfigEntity, Long> {
+
+	Optional<CdaWrapperConfigEntity> findByApiType(String ssoTokenVerifyApi);
+}
+@Getter
+@Setter
+@Entity
+@Table(name = "CDA_P_WRAPPER_APIS_CONFIG")
+public class CdaWrapperConfigEntity {
+	@Id
+	@Column(name = "ID")
+	private Long id;
+
+	@Column(name = "API_TYPE")
+	private String apiType;
+
+	@Column(name = "PAN_URL")
+	private String panUrl;
+
+	@Column(name = "OTP_URL")
+	private String otpUrl;
+
+	@Column(name = "SOURCE")
+	private String source;
+
+	@Column(name = "SUB_SOURCE")
+	private String subSource;
+
+	@Column(name = "UPN")
+	private String upn;
+
+	@Column(name = "XTID")
+	private String xtid;
+
+	@Column(name = "AUTH_TOKEN")
+	private String authToken;
+
+}
+	public String callSsoAPI(String url, String token, String body) throws RestClientException {
+
+		CdaWrapperCallEntity wrapperCallEntity = saveWrapperApiRequest(ExternalApiConstants.API_TYPE_SSO, body, url);
+		HttpHeaders httpHeaders = new HttpHeaders();
+		httpHeaders.set(ExternalApiConstants.AUTH, token);
+		httpHeaders.set(AppConstants.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+		HttpEntity<Object> httpEntity = new HttpEntity<>(body, httpHeaders);
+		RestTemplate rest = new RestTemplate();
+		String apiRes = rest.exchange(url, HttpMethod.POST, httpEntity, String.class).getBody();
+		wrapperCallEntity.setApiResponse(apiRes);
+		log.info("callSsoAPIEnd");
+		return apiRes;
+}
+@Getter
+@Setter
+@Entity
+@Table(name = "CDA_P_WRAPPER_APIS_CONFIG")
+public class CdaWrapperConfigEntity {
+	@Id
+	@Column(name = "ID")
+	private Long id;
+
+	@Column(name = "API_TYPE")
+	private String apiType;
+
+	@Column(name = "PAN_URL")
+	private String panUrl;
+
+	@Column(name = "OTP_URL")
+	private String otpUrl;
+
+	@Column(name = "SOURCE")
+	private String source;
+
+	@Column(name = "SUB_SOURCE")
+	private String subSource;
+
+	@Column(name = "UPN")
+	private String upn;
+
+	@Column(name = "XTID")
+	private String xtid;
+
+	@Column(name = "AUTH_TOKEN")
+	private String authToken;
+
+}
+	@Override
+	public LoginUserModel getUserLoginDetails(LoginUserModel loginModel) {
+		LoginUserModel cdaUserModel = new LoginUserModel();
+		if (loginModel.getToken() != null && !loginModel.getToken().trim().equals("")) {
+
+			Optional<ClUserDtls> userEntity = cdaUserRepo.findByIdAndUserIdAndMobNoAndEmailId(loginModel.getId(),
+					loginModel.getUserId(), loginModel.getMobNo(), loginModel.getEmailId());
+			if (userEntity.isPresent()) {
+				ClUserDtls entity = userEntity.get();
+				if (entity.getUserActive().equals(AppConstants.STRING_Y)) {
+					String userRole = cdaUserRepo.getUserRoles(entity.getUserId());
+					if (userRole != null && userRole.contains(AppConstants.USER_ROLE)) {
+						cdaUserModel = userMapper.getLoginUserModelFromEntity(userEntity.get());
+
+					}
+
+				}
+			}
+		}
+@Query(value = "SELECT ROLE FROM USER_ROLES WHERE USER_ID =:username ", nativeQuery = true)
+	String getUserRoles(String username);
+public String generateToken(UserDetails userDetails) {
+		Map<String, Object> claims = new HashMap<>();
+		return doGenerateToken(claims, userDetails.getUsername());
+	}
+
+	private String doGenerateToken(Map<String, Object> claims, String username) {
+		return Jwts.builder().claims().add(claims).subject(username).issuedAt(new Date(System.currentTimeMillis()))
+				.expiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000 * 1000)).and()
+				.signWith(getKey()).compact();
+	}
+
+	private SecretKey getKey() {
+		byte[] keyBytes = Decoders.BASE64.decode(secret);
+		return Keys.hmacShaKeyFor(keyBytes);
+	}
+
+	public String getUserNameFromToken(String token) {
+		return extractClaim(token, Claims::getSubject);
+	}
+
+	private <T> T extractClaim(String token, Function<Claims, T> claimResolver) {
+		final var claims = extractAllClaims(token);
+		return claimResolver.apply(claims);
+	}
+
+	private Claims extractAllClaims(String token) {
+		return Jwts.parser().verifyWith(getKey()).build().parseSignedClaims(token).getPayload();
+	}

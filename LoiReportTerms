@@ -1,0 +1,215 @@
+//
+@Override
+	public LoiReportResponse getLoiReportTermsData(String applId) {
+		List<LoiReportTermsDto> dto = new ArrayList<>();
+		LoiReportResponse conditionResponse = new LoiReportResponse();
+		try {
+			List<LoiReportTermsEntity> entity = loiReportTermsRepo.findByApplId(applId);
+			if (!entity.isEmpty()) {
+				dto = mapper.transformLoiReportTermsEntToDto(entity);
+				Map<String, List<LoiReportTermsDto>> groupedResults = dto.stream()
+						.collect(Collectors.groupingBy(reports -> reports.getTermTypeFlg()));
+				conditionResponse.setPreD(groupedResults.getOrDefault(Constants.TERMFLAG_PRED, Collections.emptyList())
+						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
+Refactor the code so this stream pipeline is used.Why is this an issue?
+
+56 minutes ago
+L58
+Bug
+
+Major
+
+Open
+
+Not assigned
+10min effort
+
+Comment
+
+java8
+				conditionResponse.setOthS(groupedResults.getOrDefault(Constants.TERMFLAG_OTHS, Collections.emptyList())
+						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
+Refactor the code so this stream pipeline is used.Why is this an issue?
+
+56 minutes ago
+L60
+Bug
+
+Major
+
+Open
+
+Not assigned
+10min effort
+
+Comment
+
+java8
+				conditionResponse.setPreL(groupedResults.getOrDefault(Constants.TERMFLAG_PREL, Collections.emptyList())
+						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
+Refactor the code so this stream pipeline is used.Why is this an issue?
+
+56 minutes ago
+L62
+Bug
+
+Major
+
+Open
+
+Not assigned
+10min effort
+
+Comment
+
+java8
+				//
+			} else {
+				List<TermAndConditionEntity> preDisbTerm = termRepo.findByApplIdAndTermTypeFlgOrderByOrderId(applId,
+						"PRE-D");
+				List<TermAndConditionEntity> othDisbTerm = termRepo.findByApplIdAndTermTypeFlgOrderByOrderId(applId,
+						"OTH-S");
+				List<LoiOfficeNoteTermsEntity> preLoiTerm = noteTermsRepo
+						.findByApplIdAndTermTypeFlgOrderByOrderId(applId, "PRE-L");
+				if (!preLoiTerm.isEmpty()) {
+					conditionResponse.setPreL(mapper.getLoiTermFromLoiOffNote(preLoiTerm));
+				}
+				if (!preDisbTerm.isEmpty()) {
+					conditionResponse.setPreD(mapper.getformLosTermReportDtofromAPPR(preDisbTerm));
+				}
+				if (!othDisbTerm.isEmpty()) {
+					conditionResponse.setOthS(mapper.getformLosTermReportDtofromAPPR(othDisbTerm));
+				}
+			}
+		} catch (Exception e) {
+			log.error("there is an Exception while getting LOIReports Listing Details Data{} and exception :-{}",
+					dto.get(0).getApplId(), e.getMessage());
+			e.printStackTrace();
+		}
+		return conditionResponse;
+//
+
+//original code
+package com.sidbi.refinance.loi.serviceimpl;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.hibernate.HibernateException;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.stereotype.Service;
+
+import com.sidbi.refinance.appr.entity.TermAndConditionEntity;
+import com.sidbi.refinance.appr.repo.TermANdConditionRepo;
+import com.sidbi.refinance.common.mapper.NbfcRefinanceMapper;
+import com.sidbi.refinance.common.util.Constants;
+import com.sidbi.refinance.loi.dto.LoiReportTermsDto;
+import com.sidbi.refinance.loi.entity.LoiOfficeNoteTermsEntity;
+import com.sidbi.refinance.loi.entity.LoiReportResponse;
+import com.sidbi.refinance.loi.entity.LoiReportTermsEntity;
+import com.sidbi.refinance.loi.repository.LoiOfficeNoteTermsRepo;
+import com.sidbi.refinance.loi.repository.LoiReportTermsRepo;
+import com.sidbi.refinance.loi.service.LoiReportTermsService;
+
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
+@Service
+public class LoiReportTermsServiceImpl implements LoiReportTermsService {
+
+	LoiReportTermsRepo loiReportTermsRepo;
+	private TermANdConditionRepo termRepo;
+	private NbfcRefinanceMapper mapper;
+	private LoiOfficeNoteTermsRepo noteTermsRepo;
+
+	public LoiReportTermsServiceImpl(LoiReportTermsRepo loiReportTermsRepo, TermANdConditionRepo termRepo,
+			NbfcRefinanceMapper mapper, LoiOfficeNoteTermsRepo noteTermsRepo) {
+		super();
+		this.loiReportTermsRepo = loiReportTermsRepo;
+		this.termRepo = termRepo;
+		this.mapper = mapper;
+		this.noteTermsRepo = noteTermsRepo;
+	}
+
+	@Override
+	public LoiReportResponse getLoiReportTermsData(String applId) {
+		List<LoiReportTermsDto> dto = new ArrayList<>();
+		LoiReportResponse conditionResponse = new LoiReportResponse();
+		try {
+
+			List<LoiReportTermsEntity> entity = loiReportTermsRepo.findByApplId(applId);
+			if (!entity.isEmpty()) {
+				dto = mapper.transformLoiReportTermsEntToDto(entity);
+				Map<String, List<LoiReportTermsDto>> groupedResults = dto.stream()
+						.collect(Collectors.groupingBy(reports -> reports.getTermTypeFlg()));
+				conditionResponse.setPreD(groupedResults.getOrDefault(Constants.TERMFLAG_PRED, Collections.emptyList())
+						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
+				conditionResponse.setOthS(groupedResults.getOrDefault(Constants.TERMFLAG_OTHS, Collections.emptyList())
+						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
+				conditionResponse.setPreL(groupedResults.getOrDefault(Constants.TERMFLAG_PREL, Collections.emptyList())
+						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
+				//
+
+			} else {
+				List<TermAndConditionEntity> preDisbTerm = termRepo.findByApplIdAndTermTypeFlgOrderByOrderId(applId,
+						"PRE-D");
+				List<TermAndConditionEntity> othDisbTerm = termRepo.findByApplIdAndTermTypeFlgOrderByOrderId(applId,
+						"OTH-S");
+				List<LoiOfficeNoteTermsEntity> preLoiTerm = noteTermsRepo
+						.findByApplIdAndTermTypeFlgOrderByOrderId(applId, "PRE-L");
+
+				if (!preLoiTerm.isEmpty()) {
+					conditionResponse.setPreL(mapper.getLoiTermFromLoiOffNote(preLoiTerm));
+				}
+				if (!preDisbTerm.isEmpty()) {
+					conditionResponse.setPreD(mapper.getformLosTermReportDtofromAPPR(preDisbTerm));
+				}
+				if (!othDisbTerm.isEmpty()) {
+					conditionResponse.setOthS(mapper.getformLosTermReportDtofromAPPR(othDisbTerm));
+				}
+
+			}
+		} catch (Exception e) {
+			log.error("there is an Exception while getting LOIReports Listing Details Data{} and exception :-{}",
+					dto.get(0).getApplId(), e.getMessage());
+			e.printStackTrace();
+
+		}
+
+		return conditionResponse;
+	}
+
+	@Override
+	public List<LoiReportTermsDto> saveReportTerms(List<LoiReportTermsDto> loiDto) {
+		for (LoiReportTermsDto dto : loiDto) {
+			if (dto.getApplId().isEmpty()) {
+				throw new IllegalArgumentException("Application Id must be a non-null string");
+
+			}
+		}
+		List<LoiReportTermsDto> loiDto2 = new ArrayList<>();
+		try {
+			List<LoiReportTermsEntity> loiListingEntity = mapper.transformLoiReportTermsDtoToEnt(loiDto);
+			loiListingEntity = loiReportTermsRepo.saveAllAndFlush(loiListingEntity);
+			loiDto2 = mapper.transformLoiReportTermsEntToDto(loiListingEntity);
+		} catch (HibernateException | JpaSystemException e) {
+			log.error("there is an Exception while saving LOI Listing Details Data{}", loiDto2.get(0).getApplId(),
+					e.getMessage());
+			e.printStackTrace();
+		} catch (Exception e) {
+			log.error("there is an Exception while saving LOI Listing Details Data{}", loiDto2.get(0).getApplId(),
+					e.getMessage());
+			e.printStackTrace();
+
+		}
+
+		return loiDto2;
+	}
+
+}
+
+//

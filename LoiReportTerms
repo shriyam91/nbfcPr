@@ -28,7 +28,22 @@ List<LoiReportTermsDto> result1 = dto.stream()
 				conditionResponse.setPreL(result3);
 
 
-//
+//new approach
+ conditionResponse.setPreD(dto.stream()
+                    .filter(reports -> "PRE-D".equalsIgnoreCase(reports.getTermTypeFlg()))
+                    .sorted(Comparator.comparing(LoiReportTermsDto::getOrderId))
+                    .toList());  // ✅ Java 16+ optimal solution
+
+            conditionResponse.setOthS(dto.stream()
+                    .filter(reports -> "OTH-S".equalsIgnoreCase(reports.getTermTypeFlg()))
+                    .sorted(Comparator.comparing(LoiReportTermsDto::getOrderId))
+                    .toList());  // ✅ Java 16+ optimal solution
+
+            conditionResponse.setPreL(dto.stream()
+                    .filter(reports -> "PRE-L".equalsIgnoreCase(reports.getTermTypeFlg()))
+                    .sorted(Comparator.comparing(LoiReportTermsDto::getOrderId))
+                    .toList());  // ✅ Java 16+ optimal solution
+
 There are two types of stream operations: intermediate operations, which return another stream, and terminal operations, which return something other than a stream. Intermediate operations are lazy, meaning they aren't actually executed until and unless a terminal stream operation is performed on their results. Consequently if the result of an intermediate stream operation is not fed to a terminal operation, it serves no purpose, which is almost certainly an error.
 
 Noncompliant Code Example

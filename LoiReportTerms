@@ -12,7 +12,23 @@
 				conditionResponse.setPreD(groupedResults.getOrDefault(Constants.TERMFLAG_PRED, Collections.emptyList())
 						.stream().sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList());
 Refactor the code so this stream pipeline is used.Why is this an issue?
+//
 
+List<LoiReportTermsDto> result1 = dto.stream()
+						.filter(reports -> reports.getTermTypeFlg().equalsIgnoreCase("PRE-D"))
+						.sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList();
+				conditionResponse.setPreD(result1);
+				List<LoiReportTermsDto> result2 = dto.stream()
+						.filter(reports -> reports.getTermTypeFlg().equalsIgnoreCase("OTH-S"))
+						.sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList();
+				conditionResponse.setOthS(result2);
+				List<LoiReportTermsDto> result3 = dto.stream()
+						.filter(reports -> reports.getTermTypeFlg().equalsIgnoreCase("PRE-L"))
+						.sorted(Comparator.comparing(LoiReportTermsDto::getOrderId)).toList();
+				conditionResponse.setPreL(result3);
+
+
+//
 56 minutes ago
 L58
 Bug

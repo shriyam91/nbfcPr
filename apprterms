@@ -1,0 +1,387 @@
+@Override
+	public Document generateAppraisalAnnexurePreDisbursementConditionsReport(Document doc, String applId) {
+		if (applId == null) {
+			throw new IllegalArgumentException(Constants.APPLID_MSG);
+		}
+		PdfFont font = reportUtil.getRupeeFordFont();
+		doc.setFont(font);
+		doc.setMargins(56.69f, 56.69f, 56.69f, 56.69f);
+
+		List<TermsAndConditionDto> termsDto = null;
+
+		try {
+			List<TermAndConditionEntity> entity = termRepo.getTermsDtlByapplIdOrderByOrderId(applId);
+			if (!entity.isEmpty()) {
+				termsDto = mapper.trnfmTermEntitiesToDtoList(entity);
+			}
+
+			float[] prewidth1 = { 10 };
+			Table pre = new Table(UnitValue.createPercentArray(prewidth1)).setFont(font).setFontSize(AppConstants.FONT);
+			pre.setWidth(UnitValue.createPercentValue(100));
+
+			Cell head = new Cell().add(new Paragraph("Annexure-I Terms and Conditions-Proposed"))
+					.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setTextAlignment(TextAlignment.LEFT)
+					.setBorder(Border.NO_BORDER);
+
+			pre.addCell(head);
+
+			Cell headCellPre = new Cell().add(new Paragraph("Pre disbursement Conditions (Key Conditions) - Term Loan"))
+					.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setTextAlignment(TextAlignment.LEFT);
+
+			pre.addCell(headCellPre);
+
+			Table preDtl = new Table(UnitValue.createPercentArray(prewidth1)).setFont(font)
+					.setFontSize(AppConstants.FONT);
+			preDtl.setWidth(UnitValue.createPercentValue(100));
+
+			if (termsDto != null) {
+				termsDto.stream().forEach(c -> {
+					if (c.getTermTypeFlg().equalsIgnoreCase(PRE_D)) {
+
+						Cell condition = new Cell()
+								.add(reportUtil.convertHtmlToElement(c.getTermName() == null ? "" : c.getTermName()))
+								.setFont(font).setFontSize(AppConstants.FONT);
+
+						preDtl.addCell(condition);
+					}
+
+				});
+
+			}
+			doc.add(pre);
+			doc.add(preDtl);
+			doc.add(ReportUtil.secSpace);
+
+			float[] otherWidth = { 10 };
+			Table other = new Table(UnitValue.createPercentArray(otherWidth)).setFont(font)
+					.setFontSize(AppConstants.FONT);
+			other.setWidth(UnitValue.createPercentValue(100));
+			float[] otherWidth1 = { 10 };
+			Table otherDtl = new Table(UnitValue.createPercentArray(otherWidth1)).setFont(font)
+					.setFontSize(AppConstants.FONT);
+			otherDtl.setWidth(UnitValue.createPercentValue(100));
+			Cell headCellOther = new Cell().add(new Paragraph("Other conditions"))
+					.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setTextAlignment(TextAlignment.LEFT);
+
+			other.addCell(headCellOther);
+
+			doc.add(ReportUtil.secSpace);
+
+			if (termsDto != null) {
+
+				termsDto.stream().forEach(c -> {
+					if (c.getTermTypeFlg().equalsIgnoreCase(OTH_S)) {
+
+						Cell conditionOther = new Cell().add(reportUtil.convertHtmlToElement(
+								String.valueOf(serialNo++) + " " + c.getTermName() == null ? "" : c.getTermName()))
+								.setFont(font).setFontSize(AppConstants.FONT);
+
+						otherDtl.addCell(conditionOther);
+					}
+
+				});
+
+			}
+
+			doc.add(other);
+			doc.add(otherDtl);
+			doc.add(ReportUtil.secSpace);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error(
+					"exception in generating the report of the annexure preDisbursement and the exception is  Exception :-{}",
+					e.getMessage());
+		}
+		return doc;
+
+	}
+//
+generateGeneralDetailsTable
+private void generateGeneralDetailsTable(Table generalDtl, AppraisalFacilityDTO appraisalFacilityDTO,
+			List<ApplicationDetails> dtoList) {
+
+		String rePayMentFre = "";
+		String borrowerName = "";
+		PdfFont font = reportUtil.getRupeeFordFont();
+		SimpleDateFormat dateFormat = new SimpleDateFormat(Constants.FRONTEND_DATE_FORMAT);
+
+		if (appraisalFacilityDTO.getRepaymentFrequency() != null) {
+			rePayMentFre = utilityMethod.getInterestRateType(appraisalFacilityDTO.getRepaymentFrequency());
+		}
+		if (dtoList != null) {
+			borrowerName = dtoList.get(0).getName();
+		}
+
+		Cell text1 = new Cell().add(new Paragraph("1")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell nameText = new Cell().add(new Paragraph("Name of the Company"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell nameComm = new Cell().add(new Paragraph(borrowerName)).setFont(font).setFontSize(AppConstants.FONT);
+
+		Cell text2 = new Cell().add(new Paragraph("2")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+				.setFontSize(AppConstants.FONT);
+
+		Cell amountText = new Cell().add(new Paragraph("Amount of Term Loan assistance"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell amountComm = new Cell();
+		if (appraisalFacilityDTO != null) {
+			amountComm
+					.add(new Paragraph(appraisalFacilityDTO.getLoanAmtProposed() == null ? " "
+							: appraisalFacilityDTO.getLoanAmtProposed() + " crore (Rupees"
+									+ converter.numberToWords(appraisalFacilityDTO.getLoanAmtProposed().toString())
+									+ " crore only) (hereinafter referred to as ‘the Loan’ or ‘the Term Loan). "))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text3 = new Cell().add(new Paragraph("3")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell schemAndPurText = new Cell().add(new Paragraph("Scheme and Purpose "))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell schemAndPur = new Cell();
+		if (appraisalFacilityDTO != null) {
+			schemAndPur
+					.add(new Paragraph("Scheme:" + reportUtil.getData(appraisalFacilityDTO.getScheme()) + "\r\n"
+							+ (reportUtil.getData(appraisalFacilityDTO.getPurpose()))))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+
+		Cell text4 = new Cell().add(new Paragraph("4")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell validityText = new Cell().add(new Paragraph("Validity period of sanction")).setFontSize(AppConstants.FONT)
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell validity = new Cell();
+		if (appraisalFacilityDTO != null) {
+			if (appraisalFacilityDTO.getDrawlValidity() != null) {
+				validity.add(new Paragraph(dateFormat.format(appraisalFacilityDTO.getDrawlValidity()))).setFont(font)
+						.setFontSize(AppConstants.FONT);
+			} else {
+				validity.add(new Paragraph("")).setFont(font).setFontSize(AppConstants.FONT);
+			}
+		}
+		Cell text5 = new Cell().add(new Paragraph("5")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell doorToDoorText = new Cell().add(new Paragraph("Door to Door/ Overall Tenure (including moratorium)"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell doorToDoor = new Cell();
+		if (appraisalFacilityDTO != null) {
+			doorToDoor
+					.add(new Paragraph("Door to door tenure of maximum "
+							+ (appraisalFacilityDTO.getTenure() == null ? "" : appraisalFacilityDTO.getTenure())
+							+ "  months including moratorium of upto "
+							+ (appraisalFacilityDTO.getMoratorium() == null ? " "
+									: appraisalFacilityDTO.getMoratorium())
+							+ " months."))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text6 = new Cell().add(new Paragraph("6")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell drawalText = new Cell().add(new Paragraph("Drawal of loan and Repayment frequency/ schedule"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell drawal = new Cell();
+		if (appraisalFacilityDTO != null) {
+			if (appraisalFacilityDTO.getRePayStartDate() != null) {
+				drawal.add(new Paragraph("Drawal of loan: The Borrower may avail the said loan in "
+						+ (appraisalFacilityDTO.getDrawalTranches() == null ? " "
+								: appraisalFacilityDTO.getDrawalTranches()).toString()
+						+ "tranches to maintain SIDBI’s position not beyond 2nd  lender level based on the latest debt profile of the Company within the validity period. Any portion not availed within the validity period shall be deemed to have been cancelled and shall not be available for drawal by the Borrower.\r\n"
+						+ "Repayment frequency: " + rePayMentFre + " installments\r\n"
+						+ "Repayment Schedule: Each tranche of disbursement shall be repayable by the Borrower as per repayment frequency after the moratorium period, commencing from the "
+						+ dateFormat.format(appraisalFacilityDTO.getRePayStartDate())
+						+ "(for e.g. 10th) of the month in which the moratorium period ends. Each tranche of disbursement will have its separate repayment schedule. \r\n"
+						+ "Actual repayment schedule will be advised to the Borrower by SIDBI at the time of disbursement. Letter of SIDBI advising the exact repayment schedule shall form part and parcel of this letter of Intent/ Master Loan Agreement."))
+						.setFont(font).setFontSize(AppConstants.FONT);
+			} else {
+				drawal.add(new Paragraph("Drawal of loan: The Borrower may avail the said loan in "
+						+ (appraisalFacilityDTO.getDrawalTranches() == null ? " "
+								: appraisalFacilityDTO.getDrawalTranches()).toString()
+						+ "tranches to maintain SIDBI’s position not beyond 2nd  lender level based on the latest debt profile of the Company within the validity period. Any portion not availed within the validity period shall be deemed to have been cancelled and shall not be available for drawal by the Borrower.\r\n"
+						+ "Repayment frequency: " + rePayMentFre + " installments\r\n"
+						+ "Repayment Schedule: Each tranche of disbursement shall be repayable by the Borrower as per repayment frequency after the moratorium period, commencing from the "
+						+ ""
+						+ "(for e.g. 10th) of the month in which the moratorium period ends. Each tranche of disbursement will have its separate repayment schedule. \r\n"
+						+ "Actual repayment schedule will be advised to the Borrower by SIDBI at the time of disbursement. Letter of SIDBI advising the exact repayment schedule shall form part and parcel of this letter of Intent/ Master Loan Agreement."))
+						.setFont(font).setFontSize(AppConstants.FONT);
+			}
+		}
+		Cell text7 = new Cell().add(new Paragraph("7")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell rePaymentText = new Cell().add(new Paragraph("Repayment cheques"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell rePayment = new Cell();
+		if (appraisalFacilityDTO != null) {
+			rePayment
+					.add(new Paragraph("The Borrower shall submit "
+							+ (appraisalFacilityDTO.getNoOfPdcs() == null ? " " : appraisalFacilityDTO.getNoOfPdcs())
+									.toString()
+							+ " number of PDCs and ensure sufficient fund availability in the account ."))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text8 = new Cell().add(new Paragraph("8")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell prepaymentText = new Cell().add(new Paragraph("Prepayment "))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell prepayment = new Cell();
+		if (appraisalFacilityDTO != null) {
+			prepayment
+					.add(new Paragraph(
+							appraisalFacilityDTO.getPrepayment() == null ? " " : appraisalFacilityDTO.getPrepayment()))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text9 = new Cell().add(new Paragraph("9")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+				.setFontSize(AppConstants.FONT);
+
+		Cell securityText = new Cell().add(new Paragraph("Security")).setBackgroundColor(new DeviceRgb(198, 195, 195))
+				.setBold().setFontSize(AppConstants.FONT);
+
+		Cell security = new Cell();
+		if (appraisalFacilityDTO != null) {
+			security.add(new Paragraph(
+					appraisalFacilityDTO.getSecurity() == null ? " " : appraisalFacilityDTO.getSecurity()))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text10 = new Cell().add(new Paragraph("10")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+		Cell interestRateText = new Cell().add(new Paragraph("Interest Rate"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell interestRate = new Cell();
+		createInterestRate(interestRate, appraisalFacilityDTO);
+		Cell text11 = new Cell().add(new Paragraph("11")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+				.setFontSize(AppConstants.FONT);
+
+		Cell interestResetText = new Cell().add(new Paragraph("Interest reset"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell interestReset = new Cell();
+		if (appraisalFacilityDTO != null) {
+			interestReset.add(new Paragraph(reportUtil.getData(appraisalFacilityDTO.getRateResetText())
+					+ " In such cases where the reset rate/refixed rate is not acceptable to the borrower, the borrower shall have an option to prepay the outstanding loan without any prepayment premium subject to compliance of the following condition:\r\n"
+					+ "At the time of reset or change in the interest rate, the Borrower can, within 5 working days from the date of intimation of reset of interest (excluding the date of intimation), serve a notice and prepay the loan without any pre-payment penalty/ charges, within 10 working days from the date of serving the notice to SIDBI.\r\n"
+					+ "")).setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text12 = new Cell().add(new Paragraph("12")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+				.setFontSize(AppConstants.FONT);
+
+		Cell penalText = new Cell().add(new Paragraph("Penal charges")).setBackgroundColor(new DeviceRgb(198, 195, 195))
+				.setBold().setFontSize(AppConstants.FONT);
+
+		Cell penal = new Cell();
+		if (appraisalFacilityDTO != null) {
+			penal.add(new Paragraph("Penal Charges shall be levied & payable as under:\r\n" + "\r\n"
+					+ "i.PENAL CHARGES ON DELAYED AND/OR NON-PAYMENT: Delay in and/ or non-payment of amount(s) of installment of principal, interest and further interest (except penal charge) on their respective due dates, shall carry penal charges, which shall be levied at \r\n"
+					+ "the rate of " + (reportUtil.getData(appraisalFacilityDTO.getPenalCharges()))
+					+ " per annum of such amount(s) for the period of default, together with applicable GST.\r\n"
+					+ "\r\n"
+					+ "ii.PENAL CHARGES ON DELAY IN COMPLIANCE AND/ OR NON-COMPLIANCE OF MATERIAL TERMS AND CONDITIONS: Delay in compliance and/ or non-compliance of terms and conditions given hereunder (hereinafter referred to as “Material Terms and Conditions”), shall also attract penal charges, to be levied at the rate(s) as mentioned hereunder for the period of such delay in compliance or non-compliance (till its compliance), together with applicable GST;\r\n"))
+					.setFont(font).setFontSize(AppConstants.FONT);
+		}
+		Cell text13 = new Cell().add(new Paragraph("13")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+				.setFontSize(AppConstants.FONT);
+
+		Cell upfrontfeeText = new Cell()
+				.add(new Paragraph("Upfront fee/ Processing Fee/ Other charges to be paid before first disbursement"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell upfrontfee = new Cell();
+		if (appraisalFacilityDTO != null) {
+			if (appraisalFacilityDTO.getUpfrontPercent() != null) {
+				upfrontfee = new Cell().add(new Paragraph(
+						"The Borrower shall pay to SIDBI a non-refundable and non-adjustable up-front fee / processing fee of "
+								+ (reportUtil.getData(appraisalFacilityDTO.getUpfrontPercent()))
+
+								+ " the GST applicable thereon.  \r\n"
+								+ "The Borrower shall also pay to SIDBI all the fees and expense incurred for documentation, security creation, due diligence, visits, data scrub etc., in-connection with the loan.\r\n"
+								+ ""))
+						.setFont(font).setFontSize(AppConstants.FONT);
+			} else {
+				upfrontfee = new Cell().add(new Paragraph(
+						"The Borrower shall pay to SIDBI a non-refundable and non-adjustable up-front fee / processing fee of "
+								+ (reportUtil.getData(appraisalFacilityDTO.getUpfrontFeeText()))
+								+ " the GST applicable thereon.  \r\n"
+								+ "The Borrower shall also pay to SIDBI all the fees and expense incurred for documentation, security creation, due diligence, visits, data scrub etc., in-connection with the loan.\r\n"
+								+ ""))
+						.setFont(font).setFontSize(AppConstants.FONT);
+			}
+		}
+		Cell text14 = new Cell().add(new Paragraph("14")).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+				.setFontSize(AppConstants.FONT);
+
+		Cell financialText = new Cell().add(new Paragraph("Financial covenants"))
+				.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold().setFontSize(AppConstants.FONT);
+
+		Cell financial = new Cell().add(new Paragraph(
+				"""
+						SIDBI shall have the right to review the terms of the loan recall the entire loan in the event of breach of any one or more of the following covenant:"
+						i)NNPA:<4%
+						ii)CRAR:>18%
+						iii)CRAR (Tier 1):>12%
+						iv)Leverage (debt to equity) to be within 5:1
+						The company shall furnish a certificate from ICA/SA in this regard as on September 30 and March 31 of each year (within 3 months from the end of respective period)"""))
+				.setFont(font).setFontSize(AppConstants.FONT);
+
+		createSubTable(penal, appraisalFacilityDTO);
+
+		generalDtl.addCell(text1);
+		generalDtl.addCell(nameText);
+		generalDtl.addCell(nameComm);
+
+		generalDtl.addCell(text2);
+		generalDtl.addCell(amountText);
+		generalDtl.addCell(amountComm);
+
+		generalDtl.addCell(text3);
+		generalDtl.addCell(schemAndPurText);
+		generalDtl.addCell(schemAndPur);
+
+		generalDtl.addCell(text4);
+		generalDtl.addCell(validityText);
+		generalDtl.addCell(validity);
+
+		generalDtl.addCell(text5);
+		generalDtl.addCell(doorToDoorText);
+		generalDtl.addCell(doorToDoor);
+
+		generalDtl.addCell(text6);
+		generalDtl.addCell(drawalText);
+		generalDtl.addCell(drawal);
+
+		generalDtl.addCell(text7);
+		generalDtl.addCell(rePaymentText);
+		generalDtl.addCell(rePayment);
+
+		generalDtl.addCell(text8);
+		generalDtl.addCell(prepaymentText);
+		generalDtl.addCell(prepayment);
+
+		generalDtl.addCell(text9);
+		generalDtl.addCell(securityText);
+		generalDtl.addCell(security);
+
+		generalDtl.addCell(text10);
+		generalDtl.addCell(interestRateText);
+		generalDtl.addCell(interestRate);
+
+		generalDtl.addCell(text11);
+		generalDtl.addCell(interestResetText);
+		generalDtl.addCell(interestReset);
+
+		generalDtl.addCell(text12);
+		generalDtl.addCell(penalText);
+		generalDtl.addCell(penal);
+
+		generalDtl.addCell(text13);
+		generalDtl.addCell(upfrontfeeText);
+		generalDtl.addCell(upfrontfee);
+
+		generalDtl.addCell(text14);
+		generalDtl.addCell(financialText);
+		generalDtl.addCell(financial);
+	}

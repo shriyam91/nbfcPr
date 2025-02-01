@@ -99,6 +99,102 @@ Refactor this method to reduce its Cognitive Complexity from 40 to the 15 allowe
 		return doc;
 
 	}
+
+solution to the above;
+//
+@Override
+public Document generateAppraisalAnnexurePreDisbursementConditionsReport(Document doc, String applId) {
+    if (applId == null) {
+        throw new IllegalArgumentException(Constants.APPLID_MSG);
+    }
+    
+    PdfFont font = reportUtil.getRupeeFordFont();
+    doc.setFont(font);
+    doc.setMargins(56.69f, 56.69f, 56.69f, 56.69f);
+
+    try {
+        List<TermsAndConditionDto> termsDto = getTermsDto(applId);
+        
+        // Add Pre-Disbursement Conditions
+        addSectionToDocument(doc, "Annexure-I Terms and Conditions-Proposed", "Pre disbursement Conditions (Key Conditions) - Term Loan", termsDto, PRE_D, font);
+        
+        // Add Other Conditions
+        addSectionToDocument(doc, null, "Other conditions", termsDto, OTH_S, font);
+
+    } catch (Exception e) {
+        log.error("Exception in generating report: {}", e.getMessage(), e);
+    }
+    return doc;
+}
+
+/**
+ * Retrieves terms and conditions DTO list for the given application ID.
+ */
+private List<TermsAndConditionDto> getTermsDto(String applId) {
+    List<TermAndConditionEntity> entity = termRepo.getTermsDtlByapplIdOrderByOrderId(applId);
+    return entity.isEmpty() ? Collections.emptyList() : mapper.trnfmTermEntitiesToDtoList(entity);
+}
+
+/**
+ * Adds a section (Pre-disbursement / Other Conditions) to the document.
+ */
+private void addSectionToDocument(Document doc, String mainHeader, String subHeader, List<TermsAndConditionDto> termsDto, String termType, PdfFont font) {
+    if (mainHeader != null) {
+        Table pre = createHeaderTable(mainHeader, font);
+        doc.add(pre);
+    }
+    
+    Table subHeaderTable = createHeaderTable(subHeader, font);
+    doc.add(subHeaderTable);
+    
+    Table detailsTable = new Table(UnitValue.createPercentArray(new float[]{10}))
+            .setFont(font).setFontSize(AppConstants.FONT)
+            .setWidth(UnitValue.createPercentValue(100));
+
+    AtomicInteger serialNo = new AtomicInteger(1); // To keep serial numbers
+
+    termsDto.stream()
+        .filter(c -> c.getTermTypeFlg().equalsIgnoreCase(termType))
+        .forEach(c -> detailsTable.addCell(createConditionCell(c, termType, font, serialNo)));
+
+    doc.add(detailsTable);
+    doc.add(ReportUtil.secSpace);
+}
+
+/**
+ * Creates a header table for sections.
+ */
+private Table createHeaderTable(String text, PdfFont font) {
+    Table table = new Table(UnitValue.createPercentArray(new float[]{10}))
+            .setFont(font)
+            .setFontSize(AppConstants.FONT)
+            .setWidth(UnitValue.createPercentValue(100));
+
+    Cell header = new Cell()
+            .add(new Paragraph(text))
+            .setBackgroundColor(new DeviceRgb(198, 195, 195))
+            .setBold()
+            .setTextAlignment(TextAlignment.LEFT)
+            .setBorder(Border.NO_BORDER);
+
+    table.addCell(header);
+    return table;
+}
+
+/**
+ * Creates a cell for a condition (Pre-Disbursement / Other).
+ */
+private Cell createConditionCell(TermsAndConditionDto c, String termType, PdfFont font, AtomicInteger serialNo) {
+    String conditionText = termType.equals(OTH_S)
+            ? serialNo.getAndIncrement() + " " + (c.getTermName() == null ? "" : c.getTermName())
+            : c.getTermName() == null ? "" : c.getTermName();
+
+    return new Cell()
+            .add(reportUtil.convertHtmlToElement(conditionText))
+            .setFont(font)
+            .setFontSize(AppConstants.FONT);
+}
+
 //
 generateGeneralDetailsTable
 private void generateGeneralDetailsTable(Table generalDtl, AppraisalFacilityDTO appraisalFacilityDTO,
@@ -388,3 +484,135 @@ private void generateGeneralDetailsTable(Table generalDtl, AppraisalFacilityDTO 
 		generalDtl.addCell(financialText);
 		generalDtl.addCell(financial);
 	}
+//
+private void generateGeneralDetailsTable(Table generalDtl, AppraisalFacilityDTO appraisalFacilityDTO,
+                                         List<ApplicationDetails> dtoList) {
+
+    String repaymentFrequency = appraisalFacilityDTO.getRepaymentFrequency() != null ?
+            utilityMethod.getInterestRateType(appraisalFacilityDTO.getRepaymentFrequency()) : "";
+    String borrowerName = (dtoList != null && !dtoList.isEmpty()) ? dtoList.get(0).getName() : "";
+    PdfFont font = reportUtil.getRupeeFordFont();
+    SimpleDateFormat dateFormat = new SimpleDateFormat(Constants.FRONTEND_DATE_FORMAT);
+
+    generalDtl.addCell(createHeaderCell("1"));
+    generalDtl.addCell(createTextCell("Name of the Company"));
+    generalDtl.addCell(createValueCell(borrowerName, font));
+
+    generalDtl.addCell(createHeaderCell("2"));
+    generalDtl.addCell(createTextCell("Amount of Term Loan assistance"));
+    generalDtl.addCell(createValueCell(formatLoanAmount(appraisalFacilityDTO), font));
+
+    generalDtl.addCell(createHeaderCell("3"));
+    generalDtl.addCell(createTextCell("Scheme and Purpose"));
+    generalDtl.addCell(createValueCell(formatSchemeAndPurpose(appraisalFacilityDTO), font));
+
+    generalDtl.addCell(createHeaderCell("4"));
+    generalDtl.addCell(createTextCell("Validity period of sanction"));
+    generalDtl.addCell(createValueCell(formatDate(appraisalFacilityDTO.getDrawlValidity(), dateFormat), font));
+
+    generalDtl.addCell(createHeaderCell("5"));
+    generalDtl.addCell(createTextCell("Door to Door/ Overall Tenure (including moratorium)"));
+    generalDtl.addCell(createValueCell(formatTenure(appraisalFacilityDTO), font));
+
+    generalDtl.addCell(createHeaderCell("6"));
+    generalDtl.addCell(createTextCell("Drawal of loan and Repayment frequency/ schedule"));
+    generalDtl.addCell(createValueCell(formatDrawal(appraisalFacilityDTO, repaymentFrequency, dateFormat), font));
+
+    generalDtl.addCell(createHeaderCell("7"));
+    generalDtl.addCell(createTextCell("Repayment cheques"));
+    generalDtl.addCell(createValueCell(formatRepaymentCheques(appraisalFacilityDTO), font));
+
+    generalDtl.addCell(createHeaderCell("8"));
+    generalDtl.addCell(createTextCell("Prepayment"));
+    generalDtl.addCell(createValueCell(reportUtil.getData(appraisalFacilityDTO.getPrepayment()), font));
+
+    generalDtl.addCell(createHeaderCell("9"));
+    generalDtl.addCell(createTextCell("Security"));
+    generalDtl.addCell(createValueCell(reportUtil.getData(appraisalFacilityDTO.getSecurity()), font));
+
+    generalDtl.addCell(createHeaderCell("10"));
+    generalDtl.addCell(createTextCell("Interest Rate"));
+    Cell interestRate = new Cell();
+    createInterestRate(interestRate, appraisalFacilityDTO);
+    generalDtl.addCell(interestRate);
+
+    generalDtl.addCell(createHeaderCell("11"));
+    generalDtl.addCell(createTextCell("Interest reset"));
+    generalDtl.addCell(createValueCell(formatInterestReset(appraisalFacilityDTO), font));
+
+    generalDtl.addCell(createHeaderCell("12"));
+    generalDtl.addCell(createTextCell("Penal charges"));
+    Cell penal = createValueCell(formatPenalCharges(appraisalFacilityDTO), font);
+    createSubTable(penal, appraisalFacilityDTO);
+    generalDtl.addCell(penal);
+
+    generalDtl.addCell(createHeaderCell("13"));
+    generalDtl.addCell(createTextCell("Upfront fee/ Processing Fee/ Other charges to be paid before first disbursement"));
+    generalDtl.addCell(createValueCell(formatUpfrontFee(appraisalFacilityDTO), font));
+
+    generalDtl.addCell(createHeaderCell("14"));
+    generalDtl.addCell(createTextCell("Financial covenants"));
+    generalDtl.addCell(createValueCell(AppConstants.FINANCIAL_COVENANTS, font));
+}
+
+private Cell createHeaderCell(String text) {
+    return new Cell().add(new Paragraph(text)).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+}
+
+private Cell createTextCell(String text) {
+    return new Cell().add(new Paragraph(text)).setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold()
+            .setFontSize(AppConstants.FONT);
+}
+
+private Cell createValueCell(String text, PdfFont font) {
+    return new Cell().add(new Paragraph(text)).setFont(font).setFontSize(AppConstants.FONT);
+}
+
+private String formatLoanAmount(AppraisalFacilityDTO dto) {
+    if (dto == null || dto.getLoanAmtProposed() == null) return " ";
+    return dto.getLoanAmtProposed() + " crore (Rupees " +
+            converter.numberToWords(dto.getLoanAmtProposed().toString()) + " crore only)";
+}
+
+private String formatSchemeAndPurpose(AppraisalFacilityDTO dto) {
+    return "Scheme: " + reportUtil.getData(dto.getScheme()) + "\n" + reportUtil.getData(dto.getPurpose());
+}
+
+private String formatDate(Date date, SimpleDateFormat dateFormat) {
+    return date != null ? dateFormat.format(date) : "";
+}
+
+private String formatTenure(AppraisalFacilityDTO dto) {
+    return "Door to door tenure of maximum " + (dto.getTenure() != null ? dto.getTenure() : "") +
+            " months including moratorium of upto " + (dto.getMoratorium() != null ? dto.getMoratorium() : "") + " months.";
+}
+
+private String formatDrawal(AppraisalFacilityDTO dto, String repaymentFrequency, SimpleDateFormat dateFormat) {
+    String startDate = dto.getRePayStartDate() != null ? dateFormat.format(dto.getRePayStartDate()) : "";
+    return "Drawal of loan: The Borrower may avail the said loan in " +
+            (dto.getDrawalTranches() != null ? dto.getDrawalTranches().toString() : " ") +
+            " tranches to maintain SIDBI’s position..." +
+            " Repayment frequency: " + repaymentFrequency + " installments" +
+            " Repayment Schedule: Each tranche of disbursement shall be repayable... commencing from the " + startDate + " of the month.";
+}
+
+private String formatRepaymentCheques(AppraisalFacilityDTO dto) {
+    return "The Borrower shall submit " + (dto.getNoOfPdcs() != null ? dto.getNoOfPdcs().toString() : " ") +
+            " number of PDCs and ensure sufficient fund availability in the account.";
+}
+
+private String formatInterestReset(AppraisalFacilityDTO dto) {
+    return reportUtil.getData(dto.getRateResetText()) +
+            " In such cases where the reset rate/refixed rate is not acceptable to the borrower...";
+}
+
+private String formatPenalCharges(AppraisalFacilityDTO dto) {
+    return "Penal Charges shall be levied & payable as under: " + reportUtil.getData(dto.getPenalCharges());
+}
+
+private String formatUpfrontFee(AppraisalFacilityDTO dto) {
+    return "The Borrower shall pay a non-refundable and non-adjustable up-front fee of " +
+            reportUtil.getData(dto.getUpfrontFeeText()) + " with applicable GST.";
+}
+
+//

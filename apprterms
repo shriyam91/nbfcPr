@@ -1,3 +1,6 @@
+
+Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.Why is this an issue?
+Refactor this method to reduce its Cognitive Complexity from 40 to the 15 allowed
 @Override
 	public Document generateAppraisalAnnexurePreDisbursementConditionsReport(Document doc, String applId) {
 		if (applId == null) {

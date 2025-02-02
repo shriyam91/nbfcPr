@@ -98,3 +98,15 @@ dependency:
         <groupId>org.apache.poi</groupId>
         <artifactId>poi-ooxml</artifactId>
     </dependency>
+
+1️⃣ If You Get XML Parsing Errors
+POI uses XML parsing for .xlsx files, so if you get errors, add this:
+
+xml
+Copy
+Edit
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-collections4</artifactId>
+    <version>4.4</version>
+</dependency>

@@ -1,0 +1,294 @@
+package com.sidbi.refinance.common.util;
+
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Component;
+
+import com.itextpdf.html2pdf.HtmlConverter;
+import com.itextpdf.io.font.PdfEncodings;
+import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.borders.Border;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Div;
+import com.itextpdf.layout.element.IBlockElement;
+import com.itextpdf.layout.element.IElement;
+import com.itextpdf.layout.element.Image;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Text;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ *
+ * @author nisg_neelanshs
+ *
+ */
+@Component
+@Slf4j
+public class ReportUtil {
+
+	// for one line space
+	public static final Paragraph secSpace = new Paragraph("\r\n").setBorder(Border.NO_BORDER);
+
+	public static final Paragraph newLine = new Paragraph("\n").setBorder(Border.NO_BORDER);
+
+	float charSpacing = (float) 0.5;
+
+	public PdfFont getPdfFont() {
+		PdfFont font = null;
+		try {
+			font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+		} catch (Exception e) {
+			log.error("exception in creating the  font for the pdf Exception ;-{}", e.getMessage());
+		}
+		return font;
+
+	}
+
+	public void addHeading(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addBoldHeading(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+		paraHead.setBold();
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addHeadingToLeft(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		headCell.setTextAlignment(TextAlignment.LEFT);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addBoldHeadingToLeft(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		headCell.setTextAlignment(TextAlignment.LEFT);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+		paraHead.setBold();
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public IBlockElement convertHtmlToElement(String html) {
+		var div = new Div();
+		try {
+			var font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+			List<IElement> elements = HtmlConverter.convertToElements(html);
+
+			for (IElement element : elements) {
+				div.add((IBlockElement) element).setFontSize(AppConstants.FONT).setFont(font);
+
+			}
+
+		} catch (Exception e) {
+			log.error("there is an exception in creating the  rich text into the pdf Excepetion {}", e.getMessage());
+		}
+
+		return div;
+	}
+
+	public String dateToString(Date date) {
+		String format = Constants.FRONTEND_DATE_FORMAT;
+		if (date == null) {
+			return "";
+		}
+		return new SimpleDateFormat(format).format(date);
+
+	}
+
+	public String localDateToString(LocalDate date) {
+		String format = Constants.FRONTEND_DATE_FORMAT;
+		if (date == null) {
+			return "";
+		}
+		var dtf = DateTimeFormatter.ofPattern(format);
+		return date.format(dtf);
+
+	}
+
+	public PdfFont getRupeeFordFont() {
+		PdfFont font = null;
+		try {
+			Resource resource = new ClassPathResource(AppConstants.RUPEE_FORD_PATH);
+
+			font = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+		} catch (IOException e) {
+			log.error("Rupee foradian font not found on the the path :-{} and the exception is {}",
+					AppConstants.RUPEE_FORD_PATH, e.getMessage());
+			
+		}
+
+		return font;
+	}
+
+	public PdfFont getTimesNewRomanFont() {
+		PdfFont font = null;
+		try {
+			Resource resource = new ClassPathResource(AppConstants.TIMES_NEW_ROMAN_PATH);
+
+			font = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+		} catch (IOException e) {
+			log.error("Times New Roman font not found on the the path :-{} and the exception is {}",
+					AppConstants.RUPEE_FORD_PATH, e.getMessage());
+			
+		}
+
+		return font;
+	}
+
+	public String getData(Double data) {
+		return java.util.Objects.isNull(data) ? " " : data.toString();
+	}
+
+	public String getData(LocalDate data) {
+		return java.util.Objects.isNull(data) ? " " : localDateToString(data);
+	}
+
+	public String getData(String data) {
+		return java.util.Objects.isNull(data) ? " " : data;
+	}
+
+	public String getData(Long data) {
+		return java.util.Objects.isNull(data) ? " " : data.toString();
+	}
+
+	public String getData(Object data) {
+		if (data instanceof Double) {
+			return getData((Double) data);
+		} else if (data instanceof LocalDate) {
+			return getData((LocalDate) data);
+		} else if (data instanceof String) {
+			return getData((String) data);
+		} else if (data instanceof Long) {
+			return getData((Long) data);
+		} else if (data instanceof Date) {
+			return dateToString((Date) data);
+		} else {
+			return java.util.Objects.isNull(data) ? " " : data.toString();
+		}
+
+	}
+
+	public String getData(int lstAudYrTm2) {
+		return (lstAudYrTm2 == 0) ? "" : lstAudYrTm2 + "";
+	}
+
+	public Image getNoRadioBox() throws IOException {
+		Resource noRadioImgRes = new ClassPathResource(AppConstants.NO_RADIO);
+		var imageDataNoR = ImageDataFactory.create(noRadioImgRes.getURL());
+		var noRadioImage = new Image(imageDataNoR);
+		noRadioImage.scale(0.7f, 0.7f);
+		return noRadioImage;
+	}
+
+	public Image getYesRadioBox() throws IOException {
+		Resource yesRadioImgRes = new ClassPathResource(AppConstants.YES_RADIO);
+		var imageDataYesR = ImageDataFactory.create(yesRadioImgRes.getURL());
+		var yesRadioImage = new Image(imageDataYesR);
+		yesRadioImage.scale(0.7f, 0.7f);
+		return yesRadioImage;
+	}
+
+	public Image getUncheckedBox() throws IOException {
+		Resource unCheckedImgRes = new ClassPathResource(AppConstants.UNCHECKED_BOX);
+		var imageDataUN = ImageDataFactory.create(unCheckedImgRes.getURL());
+		var unCheckedImage = new Image(imageDataUN);
+		unCheckedImage.scale(0.05f, 0.05f);
+		return unCheckedImage;
+	}
+
+	public Image getCheckedBox() throws IOException {
+		Resource checkedImgRes = new ClassPathResource(AppConstants.CHECKED_BOX);
+		var imageData = ImageDataFactory.create(checkedImgRes.getURL());
+		var checkedImage = new Image(imageData);
+		checkedImage.scale(0.05f, 0.05f);
+		return checkedImage;
+	}
+
+	public Paragraph getInCroreWithRupeeSymbol() {
+		Resource resource = new ClassPathResource(AppConstants.INRUPEE_FORD_PATH);
+		Paragraph p = null;
+		try {
+			var rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			PdfFont font = getRupeeFordFont();
+			Text t = new Text("(in ").setFont(font);
+			Text r = new Text("R").setFont(rfont);
+			Text t1 = new Text(" crore)").setFont(font);
+			p = new Paragraph().add(t).add(r).add(t1);
+		} catch (IOException e) {
+			log.error("Exception in rupee font {}, message {}", AppConstants.INRUPEE_FORD_PATH, e.getMessage());
+		}
+		return p;
+	}
+
+	public Paragraph getRupeeSymbol() {
+		Resource resource = new ClassPathResource(AppConstants.INRUPEE_FORD_PATH);
+		Paragraph p = null;
+		try {
+			var rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			Text r = new Text("R").setFont(rfont);
+			p = new Paragraph().add(r);
+		} catch (IOException e) {
+			log.error("Exception in rupee font {}, message {}", AppConstants.INRUPEE_FORD_PATH, e.getMessage());
+		}
+		return p;
+	}
+
+}

@@ -1,0 +1,582 @@
+package com.sidbi.refinance.online.serviceimpl;
+
+import java.time.Month;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.hibernate.HibernateException;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
+
+import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.UnitValue;
+import com.sidbi.refinance.common.util.AppConstants;
+import com.sidbi.refinance.common.util.ReportUtil;
+import com.sidbi.refinance.online.dto.OnlineCollectionEfficiencyDto;
+import com.sidbi.refinance.online.entity.ApplicationForm;
+import com.sidbi.refinance.online.entity.OnlineCollectionEfficiencyEntity;
+import com.sidbi.refinance.online.mapper.RefinanceOnlineMapper;
+import com.sidbi.refinance.online.repository.ApplicationFormRepository;
+import com.sidbi.refinance.online.repository.CollectionEfficiencyRepo;
+import com.sidbi.refinance.online.service.OnlineCollectionEfficiencyService;
+
+import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+public class OnlineCollectionEfficiencyServiceImpl implements OnlineCollectionEfficiencyService {
+
+	private final RefinanceOnlineMapper applicationMapper;
+	private final CollectionEfficiencyRepo collectEffRepo;
+	private final ApplicationFormRepository applFormRepo;
+	ReportUtil reportUtil = new ReportUtil();
+
+	public OnlineCollectionEfficiencyServiceImpl(RefinanceOnlineMapper applicationMapper,
+			CollectionEfficiencyRepo collectEffRepo, ApplicationFormRepository applFormRepo2) {
+		super();
+		this.applicationMapper = applicationMapper;
+		this.collectEffRepo = collectEffRepo;
+		this.applFormRepo = applFormRepo2;
+	}
+
+	@Override
+	public List<OnlineCollectionEfficiencyDto> saveCollectionEff(
+			List<OnlineCollectionEfficiencyDto> collectionEfficiencyDto) {
+
+		try {
+			List<OnlineCollectionEfficiencyEntity> businessProEntity = applicationMapper
+					.trnfmCollecEffDtoToEnt(collectionEfficiencyDto);
+
+			businessProEntity = collectEffRepo.saveAllAndFlush(businessProEntity);
+			collectionEfficiencyDto = applicationMapper.trnfmCollecEffEntToDto(businessProEntity);
+
+		} catch (HibernateException | JpaSystemException e) {
+			log.error("there is an Exception while saving projection cash flow getApplId:-{}, Exception:- {}",
+					collectionEfficiencyDto.get(0).getApplId(), e.getMessage());
+
+		} catch (Exception e) {
+			log.error("there is an Exception while saving projection cash flow getApplId:-{}, Exception:- {}",
+					e.getMessage());
+
+		}
+
+		return collectionEfficiencyDto;
+	}
+
+	/**
+	 * @author venkateshj, modified by info_shriyamT
+	 */
+	@Override
+	public List<OnlineCollectionEfficiencyDto> getCollectionEffByapplId(String applId) {
+
+		List<OnlineCollectionEfficiencyDto> businessprojDto = new ArrayList<>();
+		Integer monthVal = 0;
+		Integer yearVal;
+		try {
+			// List<OnlineCollectionEfficiencyEntity> entity =
+			// collectEffRepo.findByApplIdOrderBySlNo(applId);
+			List<OnlineCollectionEfficiencyEntity> entity = collectEffRepo.findByApplId(applId);
+
+			if (CollectionUtils.isNotEmpty(entity)) {
+				businessprojDto = applicationMapper.trnfmCollecEffEntToDto(entity);
+			} else {
+				Optional<ApplicationForm> form = applFormRepo.findByApplId(applId);
+				if (form.isPresent() && form.get().getLastAuditedFYT() != null
+						&& form.get().getLastQtrAfterT() != null) {
+					String month = form.get().getLastQtrAfterT();
+					String year = form.get().getLastAuditedFYT();
+					yearVal = Integer.parseInt(year);
+					monthVal = getMonthVal(monthVal, month);
+					getNext18Months(monthVal, yearVal, businessprojDto, applId);
+					Collections.reverse(businessprojDto);
+
+				}
+			}
+
+		} catch (Exception e) {
+			log.error("there is an Exception while getting Data{}", e.getMessage());
+
+		}
+		return businessprojDto;
+	}
+
+	public Integer getMonthVal(Integer monthVal, String month) {
+		if (month.contains("Q1FY")) {
+			monthVal = 6;
+		}
+		if (month.contains("H1FY")) {
+			monthVal = 9;
+		}
+		if (month.contains("9MFY")) {
+			monthVal = 12;
+		}
+		if (month.contains("Not Applicable")) {
+			monthVal = 3;
+		}
+		return monthVal;
+	}
+
+	public void getNext18Months(int startMonth, int startYear, List<OnlineCollectionEfficiencyDto> businessprojDto,
+			String applId) {
+
+		int month = startMonth - 1;
+		int year = startYear;
+		for (var i = 18; i >= 1; i--) {
+			if (month < 1) {
+				month = 12;
+				year--;
+			}
+			String monthName = Month.of(month).name();
+			String monthNYear = monthName.substring(0, 3) + "-" + year;
+			var dto = new OnlineCollectionEfficiencyDto();
+			dto.setMonth(monthNYear);
+			dto.setSlNo((long) i);
+			dto.setApplId(applId);
+			businessprojDto.add(dto);
+			month--;
+		}
+	}
+
+	@Override
+	@Transactional(rollbackOn = Exception.class)
+	public List<OnlineCollectionEfficiencyDto> updateCollectionEff(
+			List<OnlineCollectionEfficiencyDto> collectionEfficiencyDto) {
+
+		for (OnlineCollectionEfficiencyDto onlineDto : collectionEfficiencyDto) {
+			if (ObjectUtils.isEmpty(onlineDto)) {
+				throw new IllegalArgumentException("Application Id must be a non-null string");
+			}
+		}
+		try {
+			List<OnlineCollectionEfficiencyEntity> collectionEffEntity = applicationMapper
+					.trnfmCollecEffDtoToEnt(collectionEfficiencyDto);
+			collectionEfficiencyDto = applicationMapper.trnfmCollecEffEntToDto(collectionEffEntity);
+
+			if (Objects.nonNull(collectionEfficiencyDto.get(0).getApplId())) {
+				collectEffRepo.deleteAllByApplId(collectionEfficiencyDto.get(0).getApplId());
+				collectionEffEntity = collectEffRepo.saveAllAndFlush(collectionEffEntity);
+				collectionEfficiencyDto = applicationMapper.trnfmCollecEffEntToDto(collectionEffEntity);
+			}
+		} catch (HibernateException | JpaSystemException e) {
+			log.error("there is an HibernateException while Updating the Risk Concern ApplId:- {}, Exception:- {}",
+					collectionEfficiencyDto.get(0).getApplId(), e.getMessage());
+
+		} catch (Exception e) {
+			log.error("there is an Exception while Updating the Risk Concern ApplId:- {}, Exception:- {}",
+					collectionEfficiencyDto.get(0).getApplId(), e.getMessage());
+
+		}
+		return collectionEfficiencyDto;
+	}
+
+	@Override
+	public void getCollectionEffReport(Document doc, String applId) {
+		try {
+			reportUtil.addHeading("Collection Efficiency", doc);
+			List<OnlineCollectionEfficiencyDto> dto = getCollectionEffByapplId(applId);
+			if (CollectionUtils.isNotEmpty(dto)) {
+				doc.add(new Paragraph(reportUtil.getData("Months")).setBold());
+				Table colEffTab = new Table(UnitValue.createPercentArray(6)).setFontSize(AppConstants.FONT)
+						.setAutoLayout();
+				colEffTab.setWidth(UnitValue.createPercentValue(100));
+				Cell ce1 = new Cell().add(new Paragraph("Month")).setBackgroundColor(new DeviceRgb(198, 195, 195))
+						.setBold();
+				Cell ce2 = new Cell().add(new Paragraph("Opening Overdue"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce3 = new Cell().add(new Paragraph("Current Month Due"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce4 = new Cell().add(new Paragraph("Total Demand"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce5 = new Cell().add(new Paragraph("Overdue Collection"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce6 = new Cell().add(new Paragraph("Current Month Collection"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+
+				colEffTab.addCell(ce1);
+				colEffTab.addCell(ce2);
+				colEffTab.addCell(ce3);
+				colEffTab.addCell(ce4);
+				colEffTab.addCell(ce5);
+				colEffTab.addCell(ce6);
+
+				for (OnlineCollectionEfficiencyDto effDto : dto) {
+					Cell cep1 = new Cell()
+							.add(new Paragraph(reportUtil.getData(effDto.getMonth())).setFontSize(AppConstants.FONT))
+							.setBold();
+					Cell cep2 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getOpeningOvrd())).setFontSize(AppConstants.FONT));
+					Cell cep3 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getCurrMonDue())).setFontSize(AppConstants.FONT));
+					Cell cep4 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getTotDemand())).setFontSize(AppConstants.FONT));
+					Cell cep5 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getOvrdColl())).setFontSize(AppConstants.FONT));
+					Cell cep6 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getCurrMonColl())).setFontSize(AppConstants.FONT));
+
+					colEffTab.addCell(cep1);
+					colEffTab.addCell(cep2);
+					colEffTab.addCell(cep3);
+					colEffTab.addCell(cep4);
+					colEffTab.addCell(cep5);
+					colEffTab.addCell(cep6);
+
+				}
+				doc.add(colEffTab);
+				doc.add(ReportUtil.secSpace);
+				doc.add(new Paragraph(reportUtil.getData("Months")).setBold());
+				Table colEffTab1 = new Table(UnitValue.createPercentArray(6)).setFontSize(AppConstants.FONT)
+						.setAutoLayout();
+				colEffTab1.setWidth(UnitValue.createPercentValue(100));
+				Cell ce7 = new Cell().add(new Paragraph("Prepayments")).setBackgroundColor(new DeviceRgb(198, 195, 195))
+						.setBold();
+				Cell ce8 = new Cell().add(new Paragraph("Total Collection"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce9 = new Cell().add(new Paragraph("Closing Overdue"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce10 = new Cell().add(new Paragraph("Collection Efficiency(Current Month)"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				Cell ce11 = new Cell().add(new Paragraph("Overall Collection Efficiency"))
+						.setBackgroundColor(new DeviceRgb(198, 195, 195)).setBold();
+				colEffTab1.addCell(ce1);
+				colEffTab1.addCell(ce7);
+				colEffTab1.addCell(ce8);
+				colEffTab1.addCell(ce9);
+				colEffTab1.addCell(ce10);
+				colEffTab1.addCell(ce11);
+				for (OnlineCollectionEfficiencyDto effDto : dto) {
+					Cell cep1 = new Cell()
+							.add(new Paragraph(reportUtil.getData(effDto.getMonth())).setFontSize(AppConstants.FONT))
+							.setBold();
+					Cell cep7 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getPrepayAmt())).setFontSize(AppConstants.FONT));
+					Cell cep8 = new Cell()
+							.add(new Paragraph(reportUtil.getData(effDto.getTotColl())).setFontSize(AppConstants.FONT));
+					Cell cep9 = new Cell().add(
+							new Paragraph(reportUtil.getData(effDto.getClosingOvrd())).setFontSize(AppConstants.FONT));
+					Cell cep10 = new Cell().add(new Paragraph(reportUtil.getData(effDto.getCollEffCurrMon()))
+							.setFontSize(AppConstants.FONT));
+					Cell cep11 = new Cell().add(new Paragraph(reportUtil.getData(effDto.getOverallCollEff()))
+							.setFontSize(AppConstants.FONT));
+					colEffTab1.addCell(cep1);
+					colEffTab1.addCell(cep7);
+					colEffTab1.addCell(cep8);
+					colEffTab1.addCell(cep9);
+					colEffTab1.addCell(cep10);
+					colEffTab1.addCell(cep11);
+				}
+				doc.add(colEffTab1);
+				doc.add(ReportUtil.secSpace);
+			}
+		} catch (Exception e) {
+			log.error("Exception occured at getCollectionEffReport {}", e.getMessage());
+		}
+
+	}
+}
+result
+
+  "data": [
+    {
+      "slNo": 1,
+      "applId": "N000003301",
+      "month": "MAR-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 2,
+      "applId": "N000003301",
+      "month": "APR-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 3,
+      "applId": "N000003301",
+      "month": "MAY-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 4,
+      "applId": "N000003301",
+      "month": "JUN-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 5,
+      "applId": "N000003301",
+      "month": "JUL-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 6,
+      "applId": "N000003301",
+      "month": "AUG-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 7,
+      "applId": "N000003301",
+      "month": "SEP-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 8,
+      "applId": "N000003301",
+      "month": "OCT-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 9,
+      "applId": "N000003301",
+      "month": "NOV-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 10,
+      "applId": "N000003301",
+      "month": "DEC-2022",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 11,
+      "applId": "N000003301",
+      "month": "JAN-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 12,
+      "applId": "N000003301",
+      "month": "FEB-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 13,
+      "applId": "N000003301",
+      "month": "MAR-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 14,
+      "applId": "N000003301",
+      "month": "APR-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 15,
+      "applId": "N000003301",
+      "month": "MAY-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 16,
+      "applId": "N000003301",
+      "month": "JUN-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 17,
+      "applId": "N000003301",
+      "month": "JUL-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    },
+    {
+      "slNo": 18,
+      "applId": "N000003301",
+      "month": "AUG-2023",
+      "openingOvrd": null,
+      "currMonDue": null,
+      "totDemand": null,
+      "ovrdColl": null,
+      "currMonColl": null,
+      "prepayAmt": null,
+      "totColl": null,
+      "closingOvrd": null,
+      "collEffCurrMon": null,
+      "overallCollEff": null,
+      "saveStatus": null
+    }
+  ],
+  "message": "Success",
+  "status": 200
+}
+Response headers

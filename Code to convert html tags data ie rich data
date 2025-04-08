@@ -1,0 +1,18 @@
+Code to convert html tags data ie rich data 
+	public IBlockElement convertHtmlToElement(String html) {
+		var div = new Div();
+		try {
+			var font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+			List<IElement> elements = HtmlConverter.convertToElements(html);
+
+			for (IElement element : elements) {
+				div.add((IBlockElement) element).setFontSize(AppConstants.FONT).setFont(font);
+
+			}
+
+		} catch (Exception e) {
+			log.error("there is an exception in creating the  rich text into the pdf Excepetion {}", e.getMessage());
+		}
+
+		return div;
+	}

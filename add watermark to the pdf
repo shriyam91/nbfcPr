@@ -1,0 +1,23 @@
+	private void addWaterMark(Document destinationPdf) {
+
+		try {
+			var font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+			var text = new Text("Draft Document");
+			text.setFont(font);
+			text.setFontSize(56);
+			text.setOpacity(0.25f);
+
+			var para = new Paragraph(text);
+			int totalPages = destinationPdf.getPdfDocument().getNumberOfPages();
+
+			for (var i = 1; i <= totalPages; i++) {
+				destinationPdf.showTextAligned(para,
+						destinationPdf.getPdfDocument().getPage(i).getPageSize().getWidth() / 2,
+						destinationPdf.getPdfDocument().getPage(i).getPageSize().getHeight() / 2, i,
+						TextAlignment.CENTER, VerticalAlignment.MIDDLE, 45);
+			}
+		} catch (Exception e) {
+
+			log.info("there is an exception in setting the header and footer  and exception is " + e.getMessage());
+		}
+	}

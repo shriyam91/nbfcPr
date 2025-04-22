@@ -1,0 +1,408 @@
+package com.sidbi.refinance.common.util;
+
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Component;
+
+import com.itextpdf.html2pdf.HtmlConverter;
+import com.itextpdf.io.font.PdfEncodings;
+import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.borders.Border;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Div;
+import com.itextpdf.layout.element.IBlockElement;
+import com.itextpdf.layout.element.IElement;
+import com.itextpdf.layout.element.Image;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Text;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import com.sidbi.refinance.common.dto.TrxYearDto;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ *
+ * @author nisg_neelanshs
+ *
+ */
+@Component
+@Slf4j
+public class ReportUtil {
+
+	// for one line space
+	public static final Paragraph secSpace = new Paragraph("\r\n").setBorder(Border.NO_BORDER);
+
+	public static final Paragraph newLine = new Paragraph("\n").setBorder(Border.NO_BORDER);
+
+	public static final String YES_RADIO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAGMAAAAeCAYAAAA4h6CKAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVgSURBVGhD7ZjZS1VdFMCXmhmiYqhRklPYoKKJA+pDIKLoi+hLQoW+RGDOihYRlRKhoIaC4liKT6IgTg+Ff0FRpBVZWeZQzpZTTqi7vdbd53pHr3zJ7fhxfnDx7LX3wbX22mvYx4JxQEEWWIq/CjJAcYaMUJwhIxRnyAjFGTJCcYaMUJwhI0zeMz59+gRDQ0MwOjoKlpaW4O7uDufPnwdvb2+x4nCDtn358gXGxsbIPjc3Nzh37hycOXNGrDAfRp3x+/dvaGpqgnfv3oGtrS2cPHmS5FNTU7C6ugqhoaGQnJwMNjY2JD9soA0tLS3w5s0bsLe3h1OnTpF8YmICVlZWICIiAq5cuWJe+9AZuiwtLbFbt26xjIwM1tvbyzY2NsQMo+fOzk6WlpbG7t+/z9bW1sSMNtHR0ay4uFiMdjEmNydo3507d1hWVhZ79uwZ29zcFDMq+9Dm9PR0VlRUZNS+7u5u5uXlxbgzhUQF2qcr2y8GnYGbhc6Ym5uj8c7ODuMnhn74jExOTrLs7GxWV1dHY12mp6fZxYsXtRQrLy9n169fF6N/R2lpKTnj58+fQqIP6p+bm8uePHkiJNpIztC152+coVfA3759C9++fYNr166Bk5MTpaV79+5BYWGh+jczM0Np6/Lly/D69Wv48eOHeHuXEydOwMOHDyEnJwfW19fpHUwLZWVlNI/pD/My/iIjI2kNgusCAwPVc/39/SQ/KN6/f091Au07fvy4kOqD+iclJcGLFy8odRkiKiqKaml7e7uQ6HPz5k21LXutQww6w8HBAQICAmBrawsqKythdnZWzKpqRlVVFfAIgbCwMDh69CgMDAyIWW3i4+PB2toaenp64MGDB3D37l1wdHSkDcd609HRAcPDw+Dj4wM8JdI70jqUd3V10f86SNAZ6AQ/Pz8hMU5ISAjVDHzHGI8fP4bq6mr1YdIE5wYHB+HDhw9ky+3bt/c8XHrOwOKFHQWCG8JDmZ414SEMIyMjcOTIETh9+jRtrjFQIVQClULnIHja0CkXLlygMa8/1NHoGuTv7w+NjY1idDCgfdgR7ge0z8PDY0/7UEc8TBUVFUKyC0Ygrz1w7NgxWhcbGwu8RolZffScgSd5e3tbjIwjrUGFebqjZ0NISkhKSWAr6evrS+GbkJBAY3RGTU0N1NfXq0N7YWFBvHEw7Nc+CVP2IbzQQ2trq56ueMA0OXv2rHgyjJ4zsMX7/v07PfMCZTCvOjs70xwqOT4+Dq6urmJm/2C+xcjT/GG0IH19fTTG0E5MTDSYAv4raB/qvB/QPqwJpuzD+pKSkgL5+flCokL3LoaRshd6zggKCqJQxtyGpygzM5M2X8LFxYXyO56Yly9f0kYFBweL2f2BtebVq1fq/ImpTCriMTExWnkVDdKMqL8Fm4PFxUVqIEyBzQneR/AdU+Tl5ZHjvn79KiSqSJDqCf6/58+fQ1xcnJg1APe+HrxosoKCAsaVpjG2szxatFpbbHu5AozndBrvRWpqKmtraxMjFbxRoNZQ+v369WtP+UFSW1vLeB2j+4Yx5ufnGT/prLm5WUi0wdZWt62VdNdsbdF2yRbdPdDF4A0cI+PRo0f0eeDGjRvg6ekpZlR8/PgRGhoa6ObK+/VDdwvHrwslJSVgYWEBfEOpSGvy+fNnahzQPn7fMpt9Rj+HYHg+ffqUwgtzop2dHcmXl5ep1Q0PD4erV6/+Lz6HYB3BjUcwhWG3eOnSJbpHmdM+kx8KsSXFrgDzoZWVFZ0ibOV42IkVhxuMAszzaB/WQelDqG60mAOTzlAwH3rdlMK/Q3GGjFCcISMUZ8gIxRkyQnGGjFCcIRsA/gBDjyORKfmIZwAAAABJRU5ErkJggg==";
+	public static final String NO_RADIO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAGIAAAAfCAYAAAAcGRgRAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVlSURBVGhD7ZjZS1VfFMeXYyIWSSkVWiZpgzjggPoQRBj5IvaiUKIvIjQ74ECIpUgoqJFg5FApPYlCNPig9BcoiiNmapmaOQ+ZWkm522vdfW73nnOv118/uR7hfOBwz157H+5e57v3WmsfG8YBjR3HVvxq7DCaECpBE0IlaEKoBE0IlaAJoRI0IVSCxXPE0NAQDA8Pw9jYGNja2oKnpyf4+vqCt7e3GLG7ef/+Pfk4OjpK/h09ehROnjwJJ06cECOsg1kh1tbW4Pnz59DZ2Ql79+6Fw4cPk/3Lly+wsrICkZGRcPnyZdizZw/Zdxurq6tQW1sLvb294OzsDIcOHSL71NQU+R4WFgaJiYnW8w+FkLO8vMzu3LnDbt++zZqbm9n6+rroYeznz5+sqamJ3bhxgxUUFLDv37+LHmOioqJYUVGRaP3FnN2aoH/Z2dns5s2b5Av6JIH3L1++ZNevX2d3794169/r16/Z8ePHGV+owqID/ZPbtoJJIUpKSkiIhYUFYVEyPT3N0tPT2dOnT4XFGOwPDAw0mlRZWRlLTk4WrZ0DFwIKMTc3R+2NjQ3GdzpdeI9MTk6y1NRUVlVVRW05khByf/5VCEWy7uvro5iZkJAArq6uwqrE3d0d4uPjobW1lcKVHOwvLCyEtLQ0+PHjB8zMzFCoKy0tpX4MCZhn8Dp37hyNQXBcUFCQvq+rq4vs20VPTw+MjIyQfwcOHKBQlJeXB/n5+foL54ChKi4uDjo6OmBiYkI8bcz58+cptzQ2NgqLkmvXrul92WycSSFQAD8/P2ExT2hoKMVQfMYUMTEx4ODgAG/evIF79+5Bbm4u7N+/nxzF+PvixQv4+PEjnD59GniYoGekcWh/9eoVVFRUkH27QCH27dsHAQEB8OvXLygvL4fZ2VnRq8sR+J98Z0B4eDg4OjpCd3e36FXy4MEDePTokX4hGYJ97969g/7+fvIlJyfH7MJSCIGJGCuHrWBvbw/Hjh2jF2sOnAxOACeEwiC4i1CQU6dOUZvHY6rM5M74+/vDkydPRGt7QP+w8kNQbB5+6d4QHlbh06dP5J+Hh8em/uEccSE9fPhQWP6CkYXnUnBycqJxFy9eBJ5zRa8xCiFwBf/+/Vu0LIOT5SFOtJRIE5AmJIHl8JkzZ2jLxsbGUhuFePz4MVRXV+u389LSknhie9iqf9IYS/4hvGiB+vp6xVxxcRni4+Mj7pQohMAydXx8XLQ2ByeIMfLIkSPCsnUwvuKKNLxwlyBv376lNm7nS5cumdz2/wr69/nzZ7rnydZkHjx48CD1oX/4Liz5h/kwKSkJMjMzhUWH/CyCO8QcCiEwUX79+pWSqSUwkWHNjc/8FzD2tre36+Mlhi8pYV+4cMEojqIzhjvp/xIcHEzhCf8Dd8etW7foxUu4ublRvsKd0NbWRnMKCQkRvebJyMigRfnhwwdh0e0AKX/g+2xpaYHo6GjRK4OrrqCyspLxuE71tjnm5+cZXwGsrq5OWMxz9epV1tDQIFo6eNKk8k+6FhcXN7VvJzwZs6ysLMYXHLWxZOW7xKh8xdKWv1zGcxS15WD5Ki9dpbkblq/ou+SL/B0YYvJkjafO4uJisLGxAf5nlJANGRwcpCSKJ25ej++60zXuiPv379MnjZSUFPDy8hI9OgYGBqCmpob84+cpq/i3pU8cGFdxUgiGLawqzp49S3X2bv3Egf49e/aMQgbGeBcXF7J/+/aNytmIiAi4cuWK1fyz+NEPVz/GPYx/GDelj2LyXbJbwbIaqxv0z87OjvzCcpSHEjHCOlgUQsM6KKomjZ1BE0IlaEKoBE0IlaAJoRI0IVSCJoRK0IRQBQB/AM+6F58Tsl7WAAAAAElFTkSuQmCC";
+	public static final String UNCHECKED_BOX_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAV1BMVEX///8AAADCwsKDg4Pz8/PPz8+vr6+YmJhkZGRDQ0MyMjIeHh4MDAzr6+tAQECGhob4+PiMjIy8vLwkJCRWVlYXFxdpaWmfn5/Hx8ff399OTk5gYGBaWlrxZjklAAAEdElEQVR4nO2d2Y7iMBBFs68EskFY+v+/czoNDJAqkw2pyuieRwe17hk7rrJBGscZIwijOEmzfONqYpNnaRJHYTCa/z2F52+lXUbY+l6x2M9LpONPJPGW6AU76dyz2M1droUvHXk2/pzFWlbScRdRlVMF60Y660KaetoEttJBV9BOmMZwL51yFftwTDCWjria+L2gfVsoxX8neJBO9xEOZsGLdLYPcfnuGewxzOI3vIN32HfR/l30GWZHDaUzfRhSF8u3hT71u6j2NFFHnZ++i7wfdjfmVq2pRtsEMcLK3EK3rx+tjZ87ymSfzNE4Ny9teGn4p0j1Tt+D0LBam+d1ajgPdmKp59Hx8avHJwr2A9lJLvNMThlr8Dj1s7X+PPnErIDyzCn8r/sB9/RHMvACfjiJ+/UUd6t2Fo27BG4Wd7dnzKPMpiV6peTexesjj3lizybz4MR4XK+KmZttW8rEK0zRSPpxplSk0lkXwpT+vmAwi9SGToaDOR/1y5QWw3b0T2mF9qh9SaRfn2lvts0cicuWK/eNdM4V0BNEwKzdavwPqYUeIUInYsbshc5XxFxASadcBbGJab23tRheISUxoUNvr/3VQ2pf6pB+1c6O7Q7p3DInp6+mzZCNM3fID4GmfVOsFXJpuKGbz6LfpqiBdtkwtA0YwlA/MIShfmAIQ/3AEIb6gSEM9QNDGOoHhjDUDwxhqB8YwlA/MIShfmAIQ/3AEIb6gSEM9QNDGOoHhjDUDwxhqB8YwlA/MIShfmAIQ/3AEIb6gSEM9QNDGOoHhjDUDwxhqB8YwlA/MIShfmAIQ/3AEIb6gSEM9QNDGOoHhjDUDwxhqB8YwlA/MIShfmAIQ/3AEIb6gSEM9QNDGOoHhjDUDwxhqB8YwlA/MIShfmAIQ/3AEIb6gSEM9QNDGOqHMfz+/1s9Hw5F0iFXEQ11cicbDnXSIVfRDXUyJx0O+dIhV+EPdVInoUM2QyYsceLhkCsdchXEJqavphtKp1xBSGwiZqySjrmCipmvgIw10jFX0BCbwHG2ZPAonXMxR+KydZj91W2lgy6mJS597aOdnLV7Dd1T/rrsgg7bWhJJMXTdoh8nNd/Wzo10bH2972GWqXsSDruEE+NxOwoyT7JSNu0CSnKGcP/3Zzvm0Vk07RLOjMXu9owW/V9+ROPO54eTCO5PaUnsZ9GmhVpyM/h0EGQKxi+ZPdvNiXsHb6XiCm1Y/7ClaDBlouf5CFHSjvWP1IbuJmQKfU/z8pqRK6o7rfY2/Eh70RuDS0Pj59ym0juRYWVYfC49P5R740d/Sf0uqj1N1FHnG1bnlT0pBUxfbjXMwqNXUjYTc4uarfuWYrj0PUjn+hgH09Z0kU72IS7m3fc7ZtE4g9/yLo588WL/jsruos+Eb0u/evYTGrDS3MDpp512qK3NzZ5umsnf0JeG86Jyqjm3EoV9m6pfjGu9EHA3cHrZBeNKFI+5DVdJsvw3QIXn0y/fdLH1vbnLc0gQRnGSZjn5aZEomzxLkzgKxxfnPxyeSe1lh2H8AAAAAElFTkSuQmCC";
+	public static final String CHECKED_BOX_IMAGE_B64 = "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";
+
+	float charSpacing = (float) 0.5;
+
+	public PdfFont getPdfFont() {
+		PdfFont font = null;
+		try {
+			font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+		} catch (Exception e) {
+			log.error("exception in creating the  font for the pdf Exception ;-{}", e.getMessage());
+		}
+		return font;
+
+	}
+
+	public PdfFont getFontToReadRupeeSymbol() {
+		PdfFont rfont = null;
+		try {
+			Resource resource = new ClassPathResource(AppConstants.NOTO_SANS_PATH);
+
+			rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+		} 
+		catch (Exception e) {
+			log.error("exception in creating the  font for the pdf Exception ;-{}", e.getMessage());
+		}
+		return rfont;
+
+	}
+
+	public void addHeading(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addGreyHeading(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(211, 211, 211));
+		headCell.setMarginTop(90);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(0, 0, 0));
+		paraHead.setBold();
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addBoldHeading(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+		paraHead.setBold();
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addHeadingToLeft(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		headCell.setTextAlignment(TextAlignment.LEFT);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public void addBoldHeadingToLeft(String heading, Document doc) {
+
+		var headCell = new Cell();
+		headCell.setMaxWidth(UnitValue.createPercentValue(100));
+		headCell.setBackgroundColor(new DeviceRgb(25, 118, 210));
+		headCell.setMarginTop(90);
+		headCell.setTextAlignment(TextAlignment.LEFT);
+		Paragraph paraHead = new Paragraph(heading).setCharacterSpacing(charSpacing);
+		paraHead.setWidth(UnitValue.createPercentValue(100));
+		paraHead.setFontColor(new DeviceRgb(255, 255, 255));
+		paraHead.setBold();
+
+		headCell.add(paraHead);
+		doc.add(headCell);
+
+	}
+
+	public IBlockElement convertHtmlToElement(String html) {
+		var div = new Div();
+		try {
+			var font = getFontToReadRupeeSymbol();
+			// var font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+			List<IElement> elements = HtmlConverter.convertToElements(html);
+
+			for (IElement element : elements) {
+				div.add((IBlockElement) element).setFontSize(AppConstants.FONT).setFont(font);
+
+			}
+
+		} catch (Exception e) {
+			log.error("there is an exception in creating the  rich text into the pdf Excepetion {}", e.getMessage());
+		}
+
+		return div;
+	}
+
+	public static String getDatePart(LocalDateTime dateTime) {
+		String format = Constants.FRONTEND_DATE_FORMAT;
+
+		if (dateTime == null) {
+			return null;
+		}
+		var dtf = DateTimeFormatter.ofPattern(format);
+
+		return dateTime.toLocalDate().format(dtf);
+	}
+
+	public String dateToString(Date data) {
+		String format = Constants.FRONTEND_DATE_FORMAT;
+		if (data == null) {
+			return "";
+		}
+		return new SimpleDateFormat(format).format(data);
+
+	}
+
+	public String localDateToString(LocalDate date) {
+		String format = Constants.FRONTEND_DATE_FORMAT;
+		if (date == null) {
+			return "";
+		}
+		var dtf = DateTimeFormatter.ofPattern(format);
+		return date.format(dtf);
+
+	}
+
+	public PdfFont getRupeeFordFont() {
+		PdfFont font = null;
+		try {
+			Resource resource = new ClassPathResource(AppConstants.RUPEE_FORD_PATH);
+
+			font = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+		} catch (IOException e) {
+			log.error("Rupee foradian font not found on the the path :-{} and the exception is {}",
+					AppConstants.RUPEE_FORD_PATH, e.getMessage());
+
+		}
+
+		return font;
+	}
+
+	public PdfFont getINRupeeFordPathFont() {
+		PdfFont font = null;
+		try {
+			Resource resource = new ClassPathResource(AppConstants.INRUPEE_FORD_PATH);
+
+			font = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+		} catch (IOException e) {
+			log.error("InRupee path font not found on the the path :-{} and the exception is {}",
+					AppConstants.RUPEE_FORD_PATH, e.getMessage());
+
+		}
+
+		return font;
+	}
+
+	public PdfFont getTimesNewRomanFont() {
+		PdfFont font = null;
+		try {
+			Resource resource = new ClassPathResource(AppConstants.TIMES_NEW_ROMAN_PATH);
+
+			font = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+		} catch (IOException e) {
+			log.error("Times New Roman font not found on the the path :-{} and the exception is {}",
+					AppConstants.TIMES_NEW_ROMAN_PATH, e.getMessage());
+
+		}
+
+		return font;
+	}
+
+	public String getData(Double data) {
+		return java.util.Objects.isNull(data) ? " " : data.toString();
+	}
+
+	public String getData(LocalDate data) {
+		return java.util.Objects.isNull(data) ? " " : localDateToString(data);
+	}
+
+	public String getData(String data) {
+		return java.util.Objects.isNull(data) ? " " : data;
+	}
+
+	public Text getBoldData(String data) {
+		Resource resource = new ClassPathResource(AppConstants.RUPEE_FORD_PATH);
+		Text t = null;
+		try {
+			var rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			if(data!=null) {
+			t = new Text(data).setFont(rfont).setBold();
+			}
+			else {
+				t = new Text("").setFont(rfont).setBold();
+							
+			}
+		} catch (IOException e) {
+			log.error("Exception in generating bold data {}, message {}", AppConstants.INRUPEE_FORD_PATH, e.getMessage());
+		}
+		return t;
+	}
+
+	public String getData(Long data) {
+		return java.util.Objects.isNull(data) ? " " : data.toString();
+	}
+
+	public String getData(Object data) {
+		if (data instanceof Double) {
+			return getData((Double) data);
+		} else if (data instanceof LocalDate) {
+			return getData((LocalDate) data);
+		} else if (data instanceof String) {
+			return getData((String) data);
+		} else if (data instanceof Long) {
+			return getData((Long) data);
+		} else if (data instanceof Date) {
+			return dateToString((Date) data);
+		} else {
+			return java.util.Objects.isNull(data) ? " " : data.toString();
+		}
+
+	}
+
+	public String getData(int lstAudYrTm2) {
+		return (lstAudYrTm2 == 0) ? "" : lstAudYrTm2 + "";
+	}
+
+	public String getTranxYearTm2(TrxYearDto result) {
+		return result != null && result.getLstAudYrTm2() != 0 ? "FY" + result.getLstAudYrTm2() : " ";
+	}
+
+	public String getTranxYearTm1(TrxYearDto result) {
+		return result != null && result.getLstAudYrTm1() != 0 ? "FY" + result.getLstAudYrTm1() : " ";
+	}
+
+	public String getTranxYearT(TrxYearDto result) {
+		return result != null && result.getLstAudYrT() != 0 ? "FY" + result.getLstAudYrT() : "";
+	}
+
+	public Image getNoRadioBox() {
+		byte[] imageByte = java.util.Base64.getDecoder().decode(NO_RADIO_IMAGE_B64);
+		var imageDataNoR = ImageDataFactory.create(imageByte);
+		var noRadioImage = new Image(imageDataNoR);
+		noRadioImage.scale(0.7f, 0.7f);
+		return noRadioImage;
+	}
+
+	public Image getYesRadioBox() {
+		byte[] imageByte = java.util.Base64.getDecoder().decode(YES_RADIO_IMAGE_B64);
+		var imageDataYesR = ImageDataFactory.create(imageByte);
+		var yesRadioImage = new Image(imageDataYesR);
+		yesRadioImage.scale(0.7f, 0.7f);
+		return yesRadioImage;
+	}
+
+	public Image getUncheckedBox() {
+		byte[] imageByte = java.util.Base64.getDecoder().decode(UNCHECKED_BOX_IMAGE_B64);
+		var imageDataUN = ImageDataFactory.create(imageByte);
+		var unCheckedImage = new Image(imageDataUN);
+		unCheckedImage.scale(0.05f, 0.05f);
+		return unCheckedImage;
+	}
+
+	public Image getCheckedBox() {
+		byte[] imageByte = java.util.Base64.getDecoder().decode(CHECKED_BOX_IMAGE_B64);
+		var imageData = ImageDataFactory.create(imageByte);
+		var checkedImage = new Image(imageData);
+		checkedImage.scale(0.05f, 0.05f);
+		return checkedImage;
+	}
+
+	public Paragraph getInCroreWithRupeeSymbol() {
+		Resource resource = new ClassPathResource(AppConstants.INRUPEE_FORD_PATH);
+		Paragraph p = null;
+		try {
+			var rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			PdfFont font = getRupeeFordFont();
+			Text t = new Text("(in ").setFont(font);
+			Text r = new Text("R").setFont(rfont);
+			Text t1 = new Text(" crore)").setFont(font);
+			p = new Paragraph().add(t).add(r).add(t1);
+		} catch (IOException e) {
+			log.error("Exception in rupee font {}, message {}", AppConstants.INRUPEE_FORD_PATH, e.getMessage());
+		}
+		return p;
+	}
+
+	public Paragraph getRupeeSymbol() {
+		Resource resource = new ClassPathResource(AppConstants.INRUPEE_FORD_PATH);
+		Paragraph p = null;
+		try {
+			var rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			Text r = new Text("R").setFont(rfont);
+			p = new Paragraph().add(r);
+		} catch (IOException e) {
+			log.error("Exception in rupee font {}, message {}", AppConstants.INRUPEE_FORD_PATH, e.getMessage());
+		}
+		return p;
+	}
+
+	public Text getRupeeSymbolText() {
+		Resource resource = new ClassPathResource(AppConstants.INRUPEE_FORD_PATH);
+		Text t = null;
+		try {
+			var rfont = PdfFontFactory.createFont(String.valueOf(resource.getURL()), PdfEncodings.IDENTITY_H,
+					PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+			t = new Text("R").setFont(rfont).setBold();
+		} catch (IOException e) {
+			log.error("Exception in rupee font {}, message {}", AppConstants.INRUPEE_FORD_PATH, e.getMessage());
+		}
+		return t;
+	}
+
+	public String dateToString(LocalDate ratingDate) {
+		return java.util.Objects.isNull(ratingDate) ? " " : localDateToString(ratingDate);
+	}
+
+}

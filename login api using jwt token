@@ -1,0 +1,189 @@
+package com.sidbi.refinance.common.controller;
+
+import java.util.ArrayList;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.sidbi.refinance.common.model.LoginUserModel;
+import com.sidbi.refinance.common.model.resmodel.ResponseWithObject;
+import com.sidbi.refinance.common.service.RefinanceUserService;
+import com.sidbi.refinance.common.util.AppConstants;
+import com.sidbi.refinance.common.util.JwtTokenUtil;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@RestController
+@RequestMapping("auth")
+@Tag(name = "Login-API", description = "Authentication related api")
+@CrossOrigin(origins = "*")
+public class JwtAuthenticationController {
+
+	@Autowired
+	private JwtTokenUtil jwtTokenUtil;
+
+	@Autowired
+	private RefinanceUserService userDetailsService;
+
+	Logger logger = LoggerFactory.getLogger(JwtAuthenticationController.class);
+
+	@PostMapping(value = "/authenticate")
+	@Operation(summary = "Get SSO jwt token to access NBFC Refinance related  API's")
+	public ResponseEntity<Object> createAuthenticationTokenWithPath(@RequestBody LoginUserModel loginModel) {
+
+		var userId = "";
+		var password = "";
+		var ssoStatus = userDetailsService.verifyJwtTokenInSso(loginModel.getToken());
+		if (ssoStatus != null && ssoStatus.equals(AppConstants.STRING_SUCCESS)) {
+			LoginUserModel loginModel2 = userDetailsService.getUserLoginDetails(loginModel);
+			userId = loginModel2.getUserId();
+			password = loginModel2.getPassword();
+
+			if (loginModel2.getUserName() == null) {
+				return new ResponseWithObject().generateResponse(AppConstants.INVALID_CREDENTIALS,HttpStatus.OK,
+						AppConstants.INVALID_CREDENTIALS);
+			}
+
+			UserDetails details = new User(userId, password, new ArrayList<>());
+
+			final String token = jwtTokenUtil.generateToken(details);
+
+			loginModel2.setPassword("");
+			loginModel2.setPortalToken(token);
+
+			if (token != null) {
+				return new ResponseWithObject().generateResponse(AppConstants.SUCCESS, HttpStatus.OK, loginModel2);
+			} else {
+				return new ResponseWithObject().generateResponse(AppConstants.INVALID, HttpStatus.INTERNAL_SERVER_ERROR,
+						AppConstants.TOKEN_FAILED);
+			}
+		} else {
+			return new ResponseWithObject().generateResponse(AppConstants.INVA//LID, HttpStatus.INTERNAL_SERVER_ERROR,
+					AppConstants.TOKEN_FAILED);
+		}
+	}
+
+}
+//this is the jwtUtil class
+package com.sidbi.refinance.common.util;
+
+import java.io.Serial;
+import java.io.Serializable;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+
+@Component
+public class JwtTokenUtil implements Serializable {
+	/** Token Validity 30 Minutes */
+	public static final long JWT_TOKEN_VALIDITY = 1800l;
+
+	private static final Logger logger = LogManager.getLogger(JwtTokenUtil.class);
+
+	@Serial
+	private static final long serialVersionUID = 759012768326820789L;
+
+	private String secret;
+
+	public JwtTokenUtil() {
+		try {
+			var kenGen = KeyGenerator.getInstance(AppConstants.TOKEN_ALGORITHM);
+			SecretKey sk = kenGen.generateKey();
+			secret = Base64.getEncoder().encodeToString(sk.getEncoded());
+		} catch (NoSuchAlgorithmException e) {
+			logger.error(e.toString());
+		}
+	}
+
+	public String generateToken(UserDetails userDetails) {
+		Map<String, Object> claims = new HashMap<>();
+		return doGenerateToken(claims, userDetails.getUsername());
+	}
+
+	private String doGenerateToken(Map<String, Object> claims, String username) {
+		return Jwts.builder().claims().add(claims).subject(username).issuedAt(new Date(System.currentTimeMillis()))
+				.expiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000 * 1000)).and()
+				.signWith(getKey()).compact();
+	}
+
+	private SecretKey getKey() {
+		byte[] keyBytes = Decoders.BASE64.decode(secret);
+		return Keys.hmacShaKeyFor(keyBytes);
+	}
+
+	public String getUserNameFromToken(String token) {
+		return extractClaim(token, Claims::getSubject);
+	}
+
+	private <T> T extractClaim(String token, Function<Claims, T> claimResolver) {
+		final var claims = extractAllClaims(token);
+		return claimResolver.apply(claims);
+	}
+
+	private Claims extractAllClaims(String token) {
+		return Jwts.parser().verifyWith(getKey()).build().parseSignedClaims(token).getPayload();
+	}
+
+	public boolean validateToken(String token, String userNameId) {
+		final String userName = getUserNameFromToken(token);
+		return (userName.equals(userNameId) && !isTokenExpired(token));
+	}
+
+	private boolean isTokenExpired(String token) {
+		return extractExpiration(token).before(new Date());
+	}
+
+	private Date extractExpiration(String token) {
+		return extractClaim(token, Claims::getExpiration);
+	}
+
+	public String generateRefreshToken(String token) {
+		var claims2 = extractAllClaims(token);
+		var username = getUserNameFromToken(token);
+		return doRefreshGenerateToken(claims2, username);
+	}
+
+	public String doRefreshGenerateToken(Map<String, Object> claims, String username) {
+		return Jwts.builder().claims().add(claims).subject(username).issuedAt(new Date(System.currentTimeMillis()))
+				.expiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000 * 1000)).and()
+				.signWith(getKey()).compact();
+	}
+
+	public boolean canTokenBeRefreshed(String token) {
+		return (!isTokenExpired(token) || ignoreTokenExpiration(token));
+
+	}
+
+	private boolean ignoreTokenExpiration(String token) {
+		logger.info("checking to refersh the token:-{}", token);
+		return false;
+	}
+
+}

@@ -1,0 +1,25 @@
+	try {
+			
+			  byte[] dueDiliPdfBytes = Base64.getDecoder().decode(rd.getRepData());
+
+				 ByteArrayInputStream dueDiliPdfStream = new ByteArrayInputStream(dueDiliPdfBytes);
+				   PdfReader externalReader = new PdfReader(dueDiliPdfStream);
+				   PdfDocument dueDiliDoc = new PdfDocument(externalReader);
+
+				   PdfMerger merger = new PdfMerger(pdfDoc);
+				   merger.merge(dueDiliDoc, 1, dueDiliDoc.getNumberOfPages());
+				   dueDiliDoc.close();
+		
+          pdfDoc.addNewPage();//add a new page at the end of this merger
+			   doc.add(new AreaBreak(AreaBreakType.LAST_PAGE));//bring the layout of document to the last page of this complete file so that if we generate tables and add them in the
+//main pdf after this merger(which we are doing in our project) then this merger should not overlap with the next data.
+				   
+
+
+		} catch (
+
+		Exception e) {
+
+			log.error("exception in merging the report of the annexure's due diligencenote report to the dan report and the exception is  Exception :-{}",
+					e.getMessage());
+		}

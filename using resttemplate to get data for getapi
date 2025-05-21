@@ -1,0 +1,14 @@
+	public String callSsoAPI(String url, String token, String body) throws RestClientException {
+
+		CdaWrapperCallEntity wrapperCallEntity = saveWrapperApiRequest(ExternalApiConstants.API_TYPE_SSO, body, url);
+		var httpHeaders = new HttpHeaders();
+		httpHeaders.set(ExternalApiConstants.AUTH, token);
+		httpHeaders.set(AppConstants.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+		HttpEntity<Object> httpEntity = new HttpEntity<>(body, httpHeaders);
+		var rest = new RestTemplate();
+		String apiRes = rest.exchange(url, HttpMethod.POST, httpEntity, String.class).getBody();
+		wrapperCallEntity.setApiResponse(apiRes);
+		log.info("callSsoAPIEnd");
+		return apiRes;
+	}
+
